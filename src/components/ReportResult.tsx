@@ -23,11 +23,11 @@ interface ReportResultProps {
 }
 
 const DEFAULT_VERIFIED_SOURCES: Source[] = [
-  { title: '네이버 D2 - 대용량 트랜잭션 및 인프라 아키텍처 개선 사례', uri: 'https://d2.naver.com/helloworld/5936131' },
-  { title: '토스 테크 - Microservices Observability & 트레이싱 모니터링 구축기', uri: 'https://toss.tech/article/observability-101' },
-  { title: '카카오 테크 - AI 인프라 및 Distributed Queue 분산 아키텍처', uri: 'https://tech.kakao.com/posts/615' },
-  { title: '당근 엔지니어링 - 서비스 장애 회고 및 Kubernetes HPA 적용 사례', uri: 'https://medium.com/daangn/kubernetes-hpa-autoscale' },
-  { title: 'GeekNews - IT 기술 동향 및 엔지니어링 이슈 리포트', uri: 'https://news.hada.io' }
+  { title: '네이버 D2 엔지니어링 기술 블로그', uri: 'https://d2.naver.com' },
+  { title: '토스 테크 블로그 (toss.tech)', uri: 'https://toss.tech' },
+  { title: '카카오 테크 공식 블로그', uri: 'https://tech.kakao.com' },
+  { title: '당근 엔지니어링 블로그 (Medium)', uri: 'https://medium.com/daangn' },
+  { title: 'GeekNews 최신 IT/개발자 트렌드', uri: 'https://news.hada.io' }
 ];
 
 export const ReportResult: React.FC<ReportResultProps> = ({
@@ -675,10 +675,9 @@ export const ReportResult: React.FC<ReportResultProps> = ({
               })}
             </div>
 
-            {/* X Axis Title (Bottom Center) */}
-            <div className="w-full text-center pt-2 border-t border-slate-800 text-xs font-extrabold text-indigo-300 flex items-center justify-center gap-2">
+            {/* X Axis Title (Bottom Left) */}
+            <div className="w-full text-left pt-2.5 border-t border-slate-800 text-xs font-extrabold text-indigo-300 flex items-center justify-start pl-2">
               <span>▶ X축: 개발자 언급도</span>
-              <span className="text-[10px] text-slate-500 font-mono font-normal">(0pt ─────────▶ 100pt)</span>
             </div>
           </div>
 

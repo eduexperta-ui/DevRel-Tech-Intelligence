@@ -8,6 +8,7 @@ export const getTrendAnalysisPrompt = (
   articleCount: number
 ) => {
   const userTypedKeyword = keyword && keyword.trim().length > 0 ? keyword.trim() : null;
+  const currentDateStr = new Date().toISOString().slice(0, 10);
 
   return `
 너는 테크 기업 및 개발조직(Engineering Org)을 위한
@@ -16,6 +17,12 @@ export const getTrendAnalysisPrompt = (
 목표:
 개발조직 내외부의 주요 기술 트렌드, 테크 블로그 글, 컨퍼런스 발표안, 사내 기술 회고 데이터를 수집·분석하여
 DevRel 담당자, 테크 리더, 개발자 교육 기획자가 즉시 실행할 수 있는 **'기술 정보 브리프 및 DevRel 액션 리포트'**를 생성하라.
+
+[Google Search 실시간 그라운딩 & 수집 기간 제약 지침]
+- 현재 분석 실행 시점(오늘 기준일): ${currentDateStr}
+- 분석 요청 대상 기간: ${period}
+- Google Search 도구를 반드시 가동하여 선택된 소스(${dataSources.join(', ')})에서 **실제로 존재하고 오늘 기준 ${period} 이내에 최근 작성/발행된 최신 테크 포스트 및 아티클**을 직접 실시간 검색 및 파싱하라.
+- 구글 검색 결과에서 추출된 실시간 원본 기사 및 URL 정보를 바탕으로 본문에 인용표기 [1], [2]를 남기고, 출처 링크가 정확하게 매핑되도록 하라.
 
 [핵심 분석 원칙]
 1. **Signal over Noise**: 단순 기술 키워드 나열이 아닌, 실제 개발 조직의 생산성과 기술 커뮤니케이션, 채용 브랜딩에 미치는 핵심 시그널을 포착하라.
@@ -32,7 +39,8 @@ DevRel 담당자, 테크 리더, 개발자 교육 기획자가 즉시 실행할 
 - 4순위: 주요 개발자 컨퍼런스 (DEVIEW, FEConf, AWS re:Invent, Spring Camp 등) 발표안 및 최신 릴리스 노트
 
 [분석 요청 사항]
-대상 기간: ${period}
+오늘 기준일: ${currentDateStr}
+대상 기간: ${period} (실제 최근 ${period} 이내에 발행된 글 중심)
 관심 기술 카테고리: ${selectedCategories.join(', ')}
 타겟 오디언스: ${targetAges.join(', ')}
 분석 목적: ${purpose}
