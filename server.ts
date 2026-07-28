@@ -14,6 +14,15 @@ const PORT = 3000;
 const cleanEnv = (value: string | undefined) =>
   (value || '').trim().replace(/^[\"\']|[\"\']$/g, '');
 
+const getGeminiApiKey = () => 
+  cleanEnv(process.env.GEMINI_API_KEY || process.env.Gemini_API_Key || process.env.GEMINI_KEY || process.env.VITE_GEMINI_API_KEY);
+
+const getNotionApiKey = () =>
+  cleanEnv(process.env.NOTION_API_KEY || process.env.NOTION_TOKEN || process.env.NOTION_KEY || process.env.VITE_NOTION_API_KEY);
+
+const getNotionDatabaseId = () =>
+  cleanEnv(process.env.NOTION_DATABASE_ID || process.env.NOTION_DB_ID || process.env.VITE_NOTION_DATABASE_ID);
+
 const extractNotionId = (input: string) => {
   const match = input.match(
     /[a-f0-9]{32}|[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/i
@@ -154,9 +163,9 @@ app.get(['/api/health', '/health'], (req, res) => {
 });
 
 app.get(['/api/config-check', '/config-check'], (req, res) => {
-  const notionApiKey = cleanEnv(process.env.NOTION_API_KEY);
-  const notionDbIdRaw = cleanEnv(process.env.NOTION_DATABASE_ID);
-  const geminiApiKey = cleanEnv(process.env.Gemini_API_Key);
+  const notionApiKey = getNotionApiKey();
+  const notionDbIdRaw = getNotionDatabaseId();
+  const geminiApiKey = getGeminiApiKey();
 
   const normalizedNotionDbId = extractNotionId(notionDbIdRaw);
   const notionDbIdFormatValid = /^[a-f0-9]{32}$/i.test(normalizedNotionDbId);
@@ -175,6 +184,7 @@ app.get(['/api/config-check', '/config-check'], (req, res) => {
       normalizedNotionDbIdPreview: normalizedNotionDbId
         ? `${normalizedNotionDbId.slice(0, 8)}...`
         : 'invalid',
+      geminiApiKeyStatus: geminiApiKey ? 'exists' : 'missing-or-empty',
     },
   });
 });
@@ -192,11 +202,11 @@ app.post(['/api/analyze', '/analyze'], async (req, res) => {
       imageBase64,
     } = req.body;
 
-    const apiKey = cleanEnv(process.env.Gemini_API_Key);
+    const apiKey = getGeminiApiKey();
 
     if (!apiKey) {
       return res.status(500).json({
-        error: 'GEMINI_API_KEY가 서버에 설정되지 않았습니다.',
+        error: 'GEMINI_API_KEY가 서버(Vercel 환경변수)에 설정되지 않았습니다. Vercel 설정에서 GEMINI_API_KEY를 등록하고 Redeploy 해주세요.',
       });
     }
 
@@ -467,8 +477,8 @@ app.post(['/api/save-to-notion', '/save-to-notion'], async (req, res) => {
   try {
     const { markdown, period, categories, targetAges, purpose, notionPayload } = req.body;
 
-    const notionApiKey = cleanEnv(process.env.NOTION_API_KEY);
-    const notionDbIdRaw = cleanEnv(process.env.NOTION_DATABASE_ID);
+    const notionApiKey = getNotionApiKey();
+    const notionDbIdRaw = getNotionDatabaseId();
     const notionDbId = extractNotionId(notionDbIdRaw);
 
     if (!notionApiKey || !notionDbIdRaw) {

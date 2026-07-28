@@ -75,9 +75,9 @@ export const ArchitectureDiagram: React.FC = () => {
               <Radar className="w-5 h-5 text-emerald-400" />
             </div>
             <div>
-              <h3 className="text-white font-bold text-base sm:text-lg mb-1">DevRel 핵심 에이전트 역할</h3>
+              <h3 className="text-white font-bold text-base sm:text-lg mb-1">핵심 기능</h3>
               <p className="text-neutral-300 text-xs sm:text-sm font-normal leading-relaxed">
-                아티클 스캐닝부터 테크블로그 기획, 사내 세션 제안, 채용 브랜딩 카피 작성, 노션 DB 연동을 자동 처리합니다.
+                기술 시그널 스캐닝, Google Search Grounding 기반 팩트체크, 액션 브리프 도출 및 Notion/n8n 파이프라인 자동 동기화를 제공합니다.
               </p>
             </div>
           </div>
