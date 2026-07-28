@@ -1,0 +1,8 @@
+{
+  "name": "DevRel Tech Intelligence Agent",
+  "description": "A technical knowledge & DevRel intelligence agent analyzing tech trends, blog posts, conference talks, and internal session drafts for developer relations & engineering teams.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
