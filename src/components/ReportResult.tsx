@@ -582,27 +582,26 @@ export const ReportResult: React.FC<ReportResultProps> = ({
 
       {/* 2. Priority Quadrant Matrix Chart (2D 사분면 차트) */}
       <section className="bg-white border-2 border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm space-y-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-100">
-          <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full text-xs font-bold mb-2">
+        {/* Clean Header */}
+        <div className="space-y-3 pb-5 border-b border-slate-100">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full text-xs font-bold">
               <BarChart3 className="w-4 h-4 text-indigo-600" />
-              <span>우선순위 차트</span>
+              <span>우선순위 매트릭스</span>
             </div>
-            <h3 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">기술 분야별 개발자 언급도 &amp; 실무 활용성 2D 매트릭스</h3>
-            <p className="text-xs md:text-sm text-slate-500 font-medium mt-1">
-              개발자 커뮤니티 언급도(X축)와 실무 활용성(Y축)을 종합 매핑하여 기술 스택 우선순위를 시각화했습니다.
-            </p>
+            {/* Axis Info Chips */}
+            <div className="flex items-center gap-2 text-[11px] font-bold text-slate-600 flex-wrap">
+              <span className="px-2.5 py-1 bg-slate-100 rounded-lg border border-slate-200">
+                <strong className="text-indigo-600">X축:</strong> 개발자 언급도 (블로그·밋업·커뮤니티)
+              </span>
+              <span className="px-2.5 py-1 bg-slate-100 rounded-lg border border-slate-200">
+                <strong className="text-indigo-600">Y축:</strong> 실무 활용성 (안정성·트래픽·기여도)
+              </span>
+            </div>
           </div>
-          <div className="p-3 bg-indigo-50/70 border border-indigo-100 rounded-2xl text-xs space-y-1 md:max-w-xs">
-            <span className="font-bold text-indigo-900 flex items-center gap-1">
-              <Sliders className="w-3.5 h-3.5 text-indigo-600" />
-              지표 산출 도출 기준
-            </span>
-            <p className="text-[11px] text-indigo-800 leading-tight">
-              <strong>X축 (개발자 언급도):</strong> 기술 블로그, 밋업, 엔지니어링 커뮤니티 언급 빈도<br />
-              <strong>Y축 (실무 활용성):</strong> 서비스 안정성, 트래픽 대응, 엔지니어링 실무 기여도
-            </p>
-          </div>
+          <h3 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">
+            기술 분야별 개발자 언급도 &amp; 실무 활용성 2D 매트릭스
+          </h3>
         </div>
 
         {/* 2D Quadrant Grid Sizing */}
@@ -613,38 +612,47 @@ export const ReportResult: React.FC<ReportResultProps> = ({
             <div className="absolute inset-x-8 top-1/2 h-0.5 bg-slate-800/80 border-t border-dashed border-slate-700" />
             <div className="absolute inset-y-8 left-1/2 w-0.5 bg-slate-800/80 border-l border-dashed border-slate-700" />
 
-            {/* Quadrant Center Area Badges (사분면 중앙 중심 명칭 디자인) */}
-            <div className="absolute top-[22%] left-[25%] -translate-x-1/2 -translate-y-1/2 text-xs font-extrabold text-emerald-300 bg-emerald-950/50 border border-emerald-500/30 backdrop-blur-md px-4 py-2 rounded-2xl shadow-lg flex items-center gap-1.5 pointer-events-none z-0">
-              <span className="w-2 h-2 rounded-full bg-emerald-400" />
-              <span>Q2: 실무 가치 중심 (High Utility)</span>
+            {/* Quadrant Area Badges (사분면 모서리 투명 워터마크 디자인으로 데이터 노드와 겹침 및 잘림 방지) */}
+            <div className="absolute top-8 left-4 text-[11px] font-bold text-emerald-400/90 bg-slate-800/80 px-2.5 py-1 rounded-lg border border-slate-700/60 pointer-events-none z-0">
+              Q2: 실무 가치 중심 (High Utility)
             </div>
 
-            <div className="absolute top-[22%] left-[75%] -translate-x-1/2 -translate-y-1/2 text-xs font-extrabold text-amber-200 bg-amber-500/20 border border-amber-400/40 backdrop-blur-md px-4 py-2 rounded-2xl shadow-lg flex items-center gap-1.5 ring-2 ring-amber-400/15 pointer-events-none z-0">
-              <span className="w-2 h-2 rounded-full bg-amber-300 animate-ping" />
-              <span>Q1: 핵심 우선 검토 (Core Focus) ⭐</span>
+            <div className="absolute top-8 right-4 text-[11px] font-bold text-amber-300 bg-amber-500/20 px-2.5 py-1 rounded-lg border border-amber-400/30 pointer-events-none z-0">
+              Q1: 핵심 우선 검토 (Core Focus) ⭐
             </div>
 
-            <div className="absolute top-[75%] left-[25%] -translate-x-1/2 -translate-y-1/2 text-xs font-extrabold text-slate-300 bg-slate-800/60 border border-slate-700/60 backdrop-blur-md px-4 py-2 rounded-2xl shadow-lg flex items-center gap-1.5 pointer-events-none z-0">
-              <span className="w-2 h-2 rounded-full bg-slate-400" />
-              <span>Q4: 트래킹 관심 대상 (Watchlist)</span>
+            <div className="absolute bottom-10 left-4 text-[11px] font-bold text-slate-400/90 bg-slate-800/80 px-2.5 py-1 rounded-lg border border-slate-700/60 pointer-events-none z-0">
+              Q4: 트래킹 관심 대상 (Watchlist)
             </div>
 
-            <div className="absolute top-[75%] left-[75%] -translate-x-1/2 -translate-y-1/2 text-xs font-extrabold text-sky-300 bg-sky-950/50 border border-sky-500/30 backdrop-blur-md px-4 py-2 rounded-2xl shadow-lg flex items-center gap-1.5 pointer-events-none z-0">
-              <span className="w-2 h-2 rounded-full bg-sky-400" />
-              <span>Q3: 라이징 기술 주제 (Rising Topics)</span>
+            <div className="absolute bottom-10 right-4 text-[11px] font-bold text-sky-300/90 bg-slate-800/80 px-2.5 py-1 rounded-lg border border-slate-700/60 pointer-events-none z-0">
+              Q3: 라이징 기술 주제 (Rising Topics)
             </div>
 
             {/* Y Axis Title (Top Left) */}
-            <div className="absolute top-2 left-4 text-[11px] font-extrabold text-indigo-300 flex items-center gap-1">
+            <div className="absolute top-2 left-4 text-[11px] font-extrabold text-indigo-300 flex items-center gap-1 z-10">
               <span>▲ Y축: 실무 활용성 (Practical Utility)</span>
             </div>
 
             {/* Quadrant Nodes Canvas */}
             <div className="relative w-full h-full my-10 min-h-[280px]">
               {dashboardData.categoryPriorities.map((cat, idx) => {
-                // Calculate pseudo X, Y for quadrant placement based on priority and score
-                const xPct = Math.min(85, Math.max(15, (cat.score + (idx % 2 === 0 ? 8 : -10))));
-                const yPct = Math.min(85, Math.max(15, (95 - idx * 16)));
+                // Stagger nodes evenly to prevent overlapping
+                // Q1 items (idx 0 & 1): separate positions
+                let xPct = 72;
+                let yPct = 82;
+
+                if (idx === 0) {
+                  xPct = 68; // 백엔드/MSA
+                  yPct = 82;
+                } else if (idx === 1) {
+                  xPct = 84; // 클라우드/DevOps
+                  yPct = 62;
+                } else {
+                  xPct = Math.min(85, Math.max(18, (cat.score + (idx % 2 === 0 ? 10 : -15))));
+                  yPct = Math.min(85, Math.max(18, (90 - idx * 22)));
+                }
+
                 const isTop = cat.priority <= 2;
 
                 return (
@@ -654,16 +662,16 @@ export const ReportResult: React.FC<ReportResultProps> = ({
                     animate={{ scale: 1 }}
                     transition={{ delay: idx * 0.1, type: 'spring' }}
                     style={{ left: `${xPct}%`, top: `${100 - yPct}%` }}
-                    className="absolute -translate-x-1/2 -translate-y-1/2 group z-10 cursor-pointer"
+                    className="absolute -translate-x-1/2 -translate-y-1/2 group z-20 cursor-pointer"
                   >
-                    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border font-bold text-xs shadow-lg transition-all duration-300 group-hover:scale-110 ${
+                    <div className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border font-bold text-xs shadow-xl transition-all duration-300 group-hover:scale-110 ${
                       isTop 
-                        ? 'bg-amber-400 text-slate-950 border-amber-300 ring-4 ring-amber-400/20' 
+                        ? 'bg-amber-400 text-slate-950 border-amber-300 ring-4 ring-amber-400/25' 
                         : 'bg-slate-800 text-slate-100 border-slate-600 group-hover:border-indigo-400'
                     }`}>
                       <span className="w-2 h-2 rounded-full bg-current animate-pulse" />
                       <span className="whitespace-nowrap">{cat.category}</span>
-                      <span className="text-[10px] opacity-80 font-mono">({cat.score}p)</span>
+                      <span className="text-[10px] opacity-90 font-mono font-black">({cat.score}p)</span>
                     </div>
                   </motion.div>
                 );
