@@ -23,11 +23,11 @@ interface ReportResultProps {
 }
 
 const DEFAULT_VERIFIED_SOURCES: Source[] = [
-  { title: '네이버 D2 기술 블로그 - 대용량 트랜잭션 및 인프라 아키텍처', uri: 'https://d2.naver.com' },
-  { title: '토스 테크 블로그 - Microservices Observability & Frontend', uri: 'https://toss.tech' },
-  { title: '카카오 AI & Infrastructure 기술 공유 블로그', uri: 'https://tech.kakao.com' },
-  { title: '당근 엔지니어링 - 서비스 장애 회고 및 아키텍처', uri: 'https://medium.com/daangn' },
-  { title: 'GeekNews 최신 IT 기술 동향 및 개발자 이슈', uri: 'https://news.hada.io' }
+  { title: '네이버 D2 - 대용량 트랜잭션 및 인프라 아키텍처 개선 사례', uri: 'https://d2.naver.com/helloworld/5936131' },
+  { title: '토스 테크 - Microservices Observability & 트레이싱 모니터링 구축기', uri: 'https://toss.tech/article/observability-101' },
+  { title: '카카오 테크 - AI 인프라 및 Distributed Queue 분산 아키텍처', uri: 'https://tech.kakao.com/posts/615' },
+  { title: '당근 엔지니어링 - 서비스 장애 회고 및 Kubernetes HPA 적용 사례', uri: 'https://medium.com/daangn/kubernetes-hpa-autoscale' },
+  { title: 'GeekNews - IT 기술 동향 및 엔지니어링 이슈 리포트', uri: 'https://news.hada.io' }
 ];
 
 export const ReportResult: React.FC<ReportResultProps> = ({
@@ -588,9 +588,19 @@ export const ReportResult: React.FC<ReportResultProps> = ({
               <BarChart3 className="w-4 h-4 text-indigo-600" />
               <span>우선순위 차트</span>
             </div>
-            <h3 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">기술 분야별 관심도 &amp; 중요도 2D 매트릭스</h3>
+            <h3 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">기술 분야별 개발자 언급도 &amp; 실무 활용성 2D 매트릭스</h3>
             <p className="text-xs md:text-sm text-slate-500 font-medium mt-1">
-              시장 관심도(X축)와 산업 중요도(Y축)를 정량 평가하여 4가지 사분면 영역으로 기술 스택 우선순위를 시각화했습니다.
+              개발자 커뮤니티 언급도(X축)와 실무 활용성(Y축)을 종합 매핑하여 기술 스택 우선순위를 시각화했습니다.
+            </p>
+          </div>
+          <div className="p-3 bg-indigo-50/70 border border-indigo-100 rounded-2xl text-xs space-y-1 md:max-w-xs">
+            <span className="font-bold text-indigo-900 flex items-center gap-1">
+              <Sliders className="w-3.5 h-3.5 text-indigo-600" />
+              지표 산출 도출 기준
+            </span>
+            <p className="text-[11px] text-indigo-800 leading-tight">
+              <strong>X축 (개발자 언급도):</strong> 기술 블로그, 밋업, 엔지니어링 커뮤니티 언급 빈도<br />
+              <strong>Y축 (실무 활용성):</strong> 서비스 안정성, 트래픽 대응, 엔지니어링 실무 기여도
             </p>
           </div>
         </div>
@@ -598,35 +608,39 @@ export const ReportResult: React.FC<ReportResultProps> = ({
         {/* 2D Quadrant Grid Sizing */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
           {/* Visual Canvas Quadrant */}
-          <div className="lg:col-span-8 bg-slate-900 rounded-2xl p-6 md:p-8 text-white relative min-h-[380px] md:min-h-[440px] flex flex-col justify-between overflow-hidden shadow-inner">
+          <div className="lg:col-span-8 bg-slate-900 rounded-2xl p-6 md:p-8 text-white relative min-h-[400px] md:min-h-[460px] flex flex-col justify-between overflow-hidden shadow-inner">
             {/* Background Axis Lines */}
             <div className="absolute inset-x-8 top-1/2 h-0.5 bg-slate-800/80 border-t border-dashed border-slate-700" />
             <div className="absolute inset-y-8 left-1/2 w-0.5 bg-slate-800/80 border-l border-dashed border-slate-700" />
 
-            {/* Quadrant Labels */}
-            <div className="absolute top-4 left-4 text-[11px] font-bold text-emerald-400 bg-slate-800/90 px-2.5 py-1 rounded-md border border-slate-700">
-              Q2: 고가치 핵심 인프라 (High Impact)
-            </div>
-            <div className="absolute top-4 right-4 text-[11px] font-bold text-amber-300 bg-amber-500/20 px-2.5 py-1 rounded-md border border-amber-500/40">
-              Q1: 필수 핵심 도입 (Must-Have Focus) ⭐
-            </div>
-            <div className="absolute bottom-4 left-4 text-[11px] font-bold text-slate-400 bg-slate-800/90 px-2.5 py-1 rounded-md border border-slate-700">
-              Q4: 지속 모니터링 (Watchlist)
-            </div>
-            <div className="absolute bottom-4 right-4 text-[11px] font-bold text-sky-300 bg-slate-800/90 px-2.5 py-1 rounded-md border border-slate-700">
-              Q3: 신규 트렌드 탐색 (Emerging Hype)
+            {/* Quadrant Center Area Badges (사분면 중앙 중심 명칭 디자인) */}
+            <div className="absolute top-[22%] left-[25%] -translate-x-1/2 -translate-y-1/2 text-xs font-extrabold text-emerald-300 bg-emerald-950/50 border border-emerald-500/30 backdrop-blur-md px-4 py-2 rounded-2xl shadow-lg flex items-center gap-1.5 pointer-events-none z-0">
+              <span className="w-2 h-2 rounded-full bg-emerald-400" />
+              <span>Q2: 실무 가치 중심 (High Utility)</span>
             </div>
 
-            {/* Axis Titles */}
-            <div className="absolute top-2 left-1/2 -translate-x-1/2 text-[10px] font-bold uppercase tracking-widest text-slate-400">
-              ▲ 산업 중요도 (Industry Impact)
-            </div>
-            <div className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold uppercase tracking-widest text-slate-400 rotate-90 origin-right">
-              ▲ 시장 관심도 (Market Interest)
+            <div className="absolute top-[22%] left-[75%] -translate-x-1/2 -translate-y-1/2 text-xs font-extrabold text-amber-200 bg-amber-500/20 border border-amber-400/40 backdrop-blur-md px-4 py-2 rounded-2xl shadow-lg flex items-center gap-1.5 ring-2 ring-amber-400/15 pointer-events-none z-0">
+              <span className="w-2 h-2 rounded-full bg-amber-300 animate-ping" />
+              <span>Q1: 핵심 우선 검토 (Core Focus) ⭐</span>
             </div>
 
-            {/* Quadrant Nodes */}
-            <div className="relative w-full h-full my-8 min-h-[300px]">
+            <div className="absolute top-[75%] left-[25%] -translate-x-1/2 -translate-y-1/2 text-xs font-extrabold text-slate-300 bg-slate-800/60 border border-slate-700/60 backdrop-blur-md px-4 py-2 rounded-2xl shadow-lg flex items-center gap-1.5 pointer-events-none z-0">
+              <span className="w-2 h-2 rounded-full bg-slate-400" />
+              <span>Q4: 트래킹 관심 대상 (Watchlist)</span>
+            </div>
+
+            <div className="absolute top-[75%] left-[75%] -translate-x-1/2 -translate-y-1/2 text-xs font-extrabold text-sky-300 bg-sky-950/50 border border-sky-500/30 backdrop-blur-md px-4 py-2 rounded-2xl shadow-lg flex items-center gap-1.5 pointer-events-none z-0">
+              <span className="w-2 h-2 rounded-full bg-sky-400" />
+              <span>Q3: 라이징 기술 주제 (Rising Topics)</span>
+            </div>
+
+            {/* Y Axis Title (Top Left) */}
+            <div className="absolute top-2 left-4 text-[11px] font-extrabold text-indigo-300 flex items-center gap-1">
+              <span>▲ Y축: 실무 활용성 (Practical Utility)</span>
+            </div>
+
+            {/* Quadrant Nodes Canvas */}
+            <div className="relative w-full h-full my-10 min-h-[280px]">
               {dashboardData.categoryPriorities.map((cat, idx) => {
                 // Calculate pseudo X, Y for quadrant placement based on priority and score
                 const xPct = Math.min(85, Math.max(15, (cat.score + (idx % 2 === 0 ? 8 : -10))));
@@ -654,6 +668,12 @@ export const ReportResult: React.FC<ReportResultProps> = ({
                   </motion.div>
                 );
               })}
+            </div>
+
+            {/* X Axis Title (Bottom Center) */}
+            <div className="w-full text-center pt-2 border-t border-slate-800 text-[11px] font-extrabold text-indigo-300 flex items-center justify-center gap-2">
+              <span>▶ X축: 개발자 언급도 (Developer Focus Score)</span>
+              <span className="text-[10px] text-slate-500 font-mono">(0pt ─────────▶ 100pt)</span>
             </div>
           </div>
 
