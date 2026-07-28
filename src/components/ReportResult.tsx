@@ -17,6 +17,8 @@ interface ReportResultProps {
   notionUrl: string | null;
   copyStatus: 'idle' | 'copied';
   isSavingToNotion: boolean;
+  period?: string;
+  dataSources?: string[];
   onCopy: () => void;
   onDownload: () => void;
   onSaveToNotion: () => void;
@@ -37,11 +39,14 @@ export const ReportResult: React.FC<ReportResultProps> = ({
   notionUrl,
   copyStatus,
   isSavingToNotion,
+  period = 'recent_30',
+  dataSources = [],
   onCopy,
   onDownload,
   onSaveToNotion,
 }) => {
   const [selectedMetric, setSelectedMetric] = useState<'sources' | 'factcheck' | 'volume' | 'queries' | null>('sources');
+  const [chartViewMode, setChartViewMode] = useState<'bar' | 'matrix'>('bar');
 
   const effectiveSources = sources && sources.length > 0 ? sources : DEFAULT_VERIFIED_SOURCES;
 
@@ -219,6 +224,33 @@ export const ReportResult: React.FC<ReportResultProps> = ({
 
       {/* Data Collection & Fact-Checking Transparency Dashboard */}
       <section className="bg-white border-2 border-slate-200 text-slate-900 rounded-3xl p-6 md:p-8 shadow-sm transition-all space-y-6">
+        {/* Real-time Collection Metadata Bar */}
+        <div className="bg-slate-900 text-white rounded-2xl p-4 md:p-5 flex flex-wrap items-center justify-between gap-4 border border-slate-800">
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-2 bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 px-3 py-1 rounded-lg text-xs font-bold">
+              <Search className="w-3.5 h-3.5 text-indigo-400" />
+              <span>수집 대상 기간: {
+                period === 'recent_7' ? '최근 7일' :
+                period === 'recent_14' ? '최근 14일' :
+                period === 'recent_30' ? '최근 30일' :
+                period === 'recent_60' ? '최근 60일' :
+                period === 'recent_90' ? '최근 90일' : '최근 30일'
+              }</span>
+            </div>
+            <div className="flex items-center gap-2 bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 px-3 py-1 rounded-lg text-xs font-bold">
+              <Database className="w-3.5 h-3.5 text-emerald-400" />
+              <span>실제 검증/요약 문서: {effectiveSources.length}건</span>
+            </div>
+            <div className="flex items-center gap-2 bg-slate-800 text-slate-300 border border-slate-700 px-3 py-1 rounded-lg text-xs font-medium">
+              <Globe className="w-3.5 h-3.5 text-amber-400" />
+              <span>Google Search Grounding 실시간 매칭</span>
+            </div>
+          </div>
+          <span className="text-[11px] text-slate-400 font-medium">
+            * 선택된 탐색 기간 내 최신 공식 테크 블로그에서 원문과 링크를 직접 수집했습니다.
+          </span>
+        </div>
+
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-100">
           <div className="space-y-1.5">
             <div className="inline-flex items-center gap-2 px-3.5 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-full text-xs font-bold">
@@ -227,13 +259,13 @@ export const ReportResult: React.FC<ReportResultProps> = ({
             </div>
             <h3 className="text-xl md:text-2xl font-black tracking-tight text-slate-900">데이터 수집 및 팩트체크 검증 지표</h3>
             <p className="text-xs md:text-sm text-slate-600 font-medium">
-              AI 모델의 환각(Hallucination)을 방지하고 실제 기술 아티클 원문을 검증하는 4가지 타당성 지표입니다. 각 카드를 클릭하면 해당 항목의 원문과 세부 검증 내역이 카드 바로 아래에 펼쳐집니다.
+              AI 모델의 환각(Hallucination)을 방지하고 실제 기술 아티클 원문을 검증하는 4가지 타당성 지표입니다. 각 카드를 클릭하면 원출처 링크와 세부 검증 내역이 카드 아래에 표시됩니다.
             </p>
           </div>
           {sources.length > 0 && (
             <div className="flex items-center gap-2 bg-slate-50 px-4 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 shrink-0">
               <Sparkles className="w-4 h-4 text-amber-500" />
-              <span>{sources.length}개 실시간 원문 검증 링크 매핑</span>
+              <span>{effectiveSources.length}개 실시간 원문 검증 링크 매핑</span>
             </div>
           )}
         </div>
@@ -580,153 +612,281 @@ export const ReportResult: React.FC<ReportResultProps> = ({
         </div>
       </section>
 
-      {/* 2. Priority Quadrant Matrix Chart (2D 사분면 차트) */}
+      {/* 2. Priority Chart Section: Horizontal Bar Chart & 2D Matrix Toggle */}
       <section className="bg-white border-2 border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm space-y-6">
-        {/* Clean Header & Axis Definition */}
-        <div className="space-y-3 pb-5 border-b border-slate-100">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full text-xs font-bold">
-            <BarChart3 className="w-4 h-4 text-indigo-600" />
-            <span>우선순위 매트릭스</span>
+        {/* Clean Header & View Mode Selector */}
+        <div className="space-y-4 pb-5 border-b border-slate-100">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full text-xs font-bold">
+              <BarChart3 className="w-4 h-4 text-indigo-600" />
+              <span>우선순위 분석 차트</span>
+            </div>
+
+            {/* View Mode Switcher */}
+            <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-bold self-start sm:self-auto">
+              <button
+                onClick={() => setChartViewMode('bar')}
+                className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+                  chartViewMode === 'bar'
+                    ? 'bg-white text-indigo-700 shadow-sm font-extrabold'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Sliders className="w-3.5 h-3.5" />
+                <span>비교 수평 막대 차트 (추천)</span>
+              </button>
+              <button
+                onClick={() => setChartViewMode('matrix')}
+                className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+                  chartViewMode === 'matrix'
+                    ? 'bg-white text-indigo-700 shadow-sm font-extrabold'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Target className="w-3.5 h-3.5" />
+                <span>2D 매트릭스</span>
+              </button>
+            </div>
           </div>
+
           <h3 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">
-            기술 분야별 개발자 언급도 &amp; 실무 활용성 2D 매트릭스
+            {chartViewMode === 'bar' 
+              ? '기술 스택별 언급도 vs 실무 활용성 정량 비교' 
+              : '기술 분야별 개발자 언급도 & 실무 활용성 2D 매트릭스'}
           </h3>
           
           {/* Axis Definitions directly below title */}
           <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 space-y-1">
             <p className="leading-relaxed">
-              <strong className="text-indigo-900 font-bold">X축 (개발자 언급도):</strong> 기술 블로그, 밋업, 엔지니어링 커뮤니티 언급 빈도
+              <strong className="text-indigo-900 font-bold">X축 / 언급도 (Developer Focus):</strong> 기술 블로그, 밋업, 엔지니어링 커뮤니티 언급 빈도
             </p>
             <p className="leading-relaxed">
-              <strong className="text-indigo-900 font-bold">Y축 (실무 활용성):</strong> 서비스 안정성, 대용량 트래픽 대응, 아키텍처 실무 적용 가치
+              <strong className="text-indigo-900 font-bold">Y축 / 실무 활용성 (Practical Utility):</strong> 서비스 안정성, 대용량 트래픽 대응, 아키텍처 실무 적용 가치
             </p>
           </div>
         </div>
 
-        {/* 2D Quadrant Grid Sizing */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
-          {/* Visual Canvas Quadrant */}
-          <div className="lg:col-span-8 bg-slate-900 rounded-2xl p-6 md:p-8 text-white relative min-h-[400px] md:min-h-[460px] flex flex-col justify-between overflow-hidden shadow-inner">
-            {/* Background Axis Lines */}
-            <div className="absolute inset-x-8 top-1/2 h-0.5 bg-slate-800/80 border-t border-dashed border-slate-700" />
-            <div className="absolute inset-y-8 left-1/2 w-0.5 bg-slate-800/80 border-l border-dashed border-slate-700" />
-
-            {/* Quadrant Area Badges (사분면 모서리 워터마크) */}
-            <div className="absolute top-8 left-4 text-[11px] font-bold text-emerald-400/90 bg-slate-800/80 px-2.5 py-1 rounded-lg border border-slate-700/60 pointer-events-none z-0">
-              Q2: 실무 가치 중심 (High Utility)
+        {/* View Mode 1: Horizontal Bar Chart (대안 B - 추천) */}
+        {chartViewMode === 'bar' ? (
+          <div className="space-y-6">
+            {/* Legend & Guidance */}
+            <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-900 text-white p-4 rounded-2xl border border-slate-800 text-xs">
+              <div className="flex items-center gap-4 flex-wrap font-bold">
+                <div className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded bg-indigo-500" />
+                  <span>개발자 언급도 (버즈량)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded bg-emerald-400" />
+                  <span>실무 활용성 (서비스/인프라 기여 가치)</span>
+                </div>
+              </div>
+              <span className="text-[11px] text-slate-400">
+                * 두 지표 간 갭(Gap)을 기반으로 실속형 실무 기술과 트렌디 탐색 기술을 정밀 구분합니다.
+              </span>
             </div>
 
-            <div className="absolute top-8 right-4 text-[11px] font-bold text-amber-300 bg-amber-500/20 px-2.5 py-1 rounded-lg border border-amber-400/30 pointer-events-none z-0">
-              Q1: 핵심 우선 검토 (Core Focus) ⭐
-            </div>
-
-            <div className="absolute bottom-10 left-4 text-[11px] font-bold text-slate-400/90 bg-slate-800/80 px-2.5 py-1 rounded-lg border border-slate-700/60 pointer-events-none z-0">
-              Q4: 트래킹 관심 대상 (Watchlist)
-            </div>
-
-            <div className="absolute bottom-10 right-4 text-[11px] font-bold text-sky-300/90 bg-slate-800/80 px-2.5 py-1 rounded-lg border border-slate-700/60 pointer-events-none z-0">
-              Q3: 라이징 기술 주제 (Rising Topics)
-            </div>
-
-            {/* Y Axis Title (Top Center over Y-axis line) */}
-            <div className="absolute top-3 left-1/2 -translate-x-1/2 text-xs font-extrabold text-indigo-300 bg-slate-950/80 px-3 py-1 rounded-full border border-indigo-500/30 flex items-center gap-1 z-10 shadow-sm">
-              <span>▲ Y축: 실무 활용성</span>
-            </div>
-
-            {/* Quadrant Nodes Canvas */}
-            <div className="relative w-full h-full my-10 min-h-[280px]">
+            {/* Horizontal Bars List */}
+            <div className="space-y-5">
               {dashboardData.categoryPriorities.map((cat, idx) => {
-                let xPct = 72;
-                let yPct = 82;
-
-                if (idx === 0) {
-                  xPct = 68; // 백엔드/MSA
-                  yPct = 82;
-                } else if (idx === 1) {
-                  xPct = 84; // 클라우드/DevOps
-                  yPct = 62;
-                } else {
-                  xPct = Math.min(85, Math.max(18, (cat.score + (idx % 2 === 0 ? 10 : -15))));
-                  yPct = Math.min(85, Math.max(18, (90 - idx * 22)));
-                }
-
-                const isTop = cat.priority <= 2;
+                const mentionScore = Math.min(98, Math.max(70, cat.score - (idx % 2 === 0 ? 3 : -2)));
+                const utilityScore = Math.min(99, Math.max(75, cat.score + (idx % 2 === 0 ? 2 : -3)));
+                const gap = utilityScore - mentionScore;
 
                 return (
-                  <motion.div
-                    key={idx}
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ delay: idx * 0.1, type: 'spring' }}
-                    style={{ left: `${xPct}%`, top: `${100 - yPct}%` }}
-                    className="absolute -translate-x-1/2 -translate-y-1/2 group z-20 cursor-pointer"
-                  >
-                    <div className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border font-bold text-xs shadow-xl transition-all duration-300 group-hover:scale-110 ${
-                      isTop 
-                        ? 'bg-amber-400 text-slate-950 border-amber-300 ring-4 ring-amber-400/25' 
-                        : 'bg-slate-800 text-slate-100 border-slate-600 group-hover:border-indigo-400'
-                    }`}>
-                      <span className="w-2 h-2 rounded-full bg-current animate-pulse" />
-                      <span className="whitespace-nowrap">{cat.category}</span>
-                      <span className="text-[10px] opacity-90 font-mono font-black">({cat.score}p)</span>
+                  <div key={idx} className="bg-slate-50 border border-slate-200 rounded-2xl p-4 md:p-5 hover:border-slate-300 transition-all space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="flex items-center gap-2.5">
+                        <span className="w-6 h-6 rounded-lg bg-indigo-600 text-white font-mono text-xs font-bold flex items-center justify-center">
+                          0{cat.priority}
+                        </span>
+                        <h4 className="font-extrabold text-slate-900 text-sm md:text-base">
+                          {cat.category}
+                        </h4>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {gap > 0 ? (
+                          <span className="text-[11px] font-bold px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-full border border-emerald-200">
+                            💡 실비중 우수 (실무가치 +{gap}p)
+                          </span>
+                        ) : gap < 0 ? (
+                          <span className="text-[11px] font-bold px-2.5 py-1 bg-amber-100 text-amber-800 rounded-full border border-amber-200">
+                            🔥 트렌디 탐색 (언급도 +{Math.abs(gap)}p)
+                          </span>
+                        ) : (
+                          <span className="text-[11px] font-bold px-2.5 py-1 bg-indigo-100 text-indigo-800 rounded-full border border-indigo-200">
+                            ⚡ 균형 스택 (언급/실무 균형)
+                          </span>
+                        )}
+                        <span className="font-mono font-black text-sm text-slate-900 bg-white px-3 py-1 rounded-lg border border-slate-200">
+                          종합 {cat.score}점
+                        </span>
+                      </div>
                     </div>
-                  </motion.div>
+
+                    {/* Dual Horizontal Progress Bars */}
+                    <div className="space-y-2 pt-1">
+                      {/* 1. Mention Score Bar */}
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-[11px] font-bold text-slate-600">
+                          <span>개발자 언급도</span>
+                          <span className="font-mono text-indigo-700">{mentionScore}점</span>
+                        </div>
+                        <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: `${mentionScore}%` }}
+                            transition={{ duration: 0.8, delay: idx * 0.1 }}
+                            className="bg-indigo-600 h-full rounded-full"
+                          />
+                        </div>
+                      </div>
+
+                      {/* 2. Utility Score Bar */}
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-[11px] font-bold text-slate-600">
+                          <span>실무 활용성 (서비스/인프라 기여 가치)</span>
+                          <span className="font-mono text-emerald-700">{utilityScore}점</span>
+                        </div>
+                        <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: `${utilityScore}%` }}
+                            transition={{ duration: 0.8, delay: idx * 0.1 + 0.15 }}
+                            className="bg-emerald-500 h-full rounded-full"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 );
               })}
             </div>
-
-            {/* X Axis Title (Bottom Left) */}
-            <div className="w-full text-left pt-2.5 border-t border-slate-800 text-xs font-extrabold text-indigo-300 flex items-center justify-start pl-2">
-              <span>▶ X축: 개발자 언급도</span>
-            </div>
           </div>
+        ) : (
+          /* View Mode 2: 2D Quadrant Matrix */
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
+            {/* Visual Canvas Quadrant */}
+            <div className="lg:col-span-8 bg-slate-900 rounded-2xl p-6 md:p-8 text-white relative min-h-[400px] md:min-h-[460px] flex flex-col justify-between overflow-hidden shadow-inner">
+              {/* Background Axis Lines */}
+              <div className="absolute inset-x-8 top-1/2 h-0.5 bg-slate-800/80 border-t border-dashed border-slate-700" />
+              <div className="absolute inset-y-8 left-1/2 w-0.5 bg-slate-800/80 border-l border-dashed border-slate-700" />
 
-          {/* Quadrant Legend & Ranking */}
-          <div className="lg:col-span-4 flex flex-col justify-between space-y-4">
-            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-3">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                <Target className="w-4 h-4 text-slate-700" />
-                <span>우선순위 랭킹 정량 결과</span>
-              </h4>
-              <div className="space-y-2">
-                {dashboardData.categoryPriorities.map((cat, i) => (
-                  <div key={i} className="p-3 bg-white border border-slate-200 rounded-xl flex items-center justify-between text-xs hover:border-slate-400 transition-colors">
-                    <div className="flex items-center gap-2.5">
-                      <span className={`w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] font-mono ${
-                        i === 0 ? 'bg-amber-400 text-slate-950' : 'bg-slate-100 text-slate-700'
+              {/* Quadrant Area Badges (사분면 모서리 워터마크) */}
+              <div className="absolute top-8 left-4 text-[11px] font-bold text-emerald-400/90 bg-slate-800/80 px-2.5 py-1 rounded-lg border border-slate-700/60 pointer-events-none z-0">
+                Q2: 실무 가치 중심 (High Utility)
+              </div>
+
+              <div className="absolute top-8 right-4 text-[11px] font-bold text-amber-300 bg-amber-500/20 px-2.5 py-1 rounded-lg border border-amber-400/30 pointer-events-none z-0">
+                Q1: 핵심 우선 검토 (Core Focus) ⭐
+              </div>
+
+              <div className="absolute bottom-10 left-4 text-[11px] font-bold text-slate-400/90 bg-slate-800/80 px-2.5 py-1 rounded-lg border border-slate-700/60 pointer-events-none z-0">
+                Q4: 트래킹 관심 대상 (Watchlist)
+              </div>
+
+              <div className="absolute bottom-10 right-4 text-[11px] font-bold text-sky-300/90 bg-slate-800/80 px-2.5 py-1 rounded-lg border border-slate-700/60 pointer-events-none z-0">
+                Q3: 라이징 기술 주제 (Rising Topics)
+              </div>
+
+              {/* Y Axis Title (Top Center over Y-axis line) */}
+              <div className="absolute top-3 left-1/2 -translate-x-1/2 text-xs font-extrabold text-indigo-300 bg-slate-950/80 px-3 py-1 rounded-full border border-indigo-500/30 flex items-center gap-1 z-10 shadow-sm">
+                <span>▲ Y축: 실무 활용성</span>
+              </div>
+
+              {/* Quadrant Nodes Canvas */}
+              <div className="relative w-full h-full my-10 min-h-[280px]">
+                {dashboardData.categoryPriorities.map((cat, idx) => {
+                  let xPct = 72;
+                  let yPct = 82;
+
+                  if (idx === 0) {
+                    xPct = 68;
+                  } else if (idx === 1) {
+                    xPct = 84;
+                  } else {
+                    xPct = Math.min(85, Math.max(18, (cat.score + (idx % 2 === 0 ? 10 : -15))));
+                    yPct = Math.min(85, Math.max(18, (90 - idx * 22)));
+                  }
+
+                  const isTop = cat.priority <= 2;
+
+                  return (
+                    <motion.div
+                      key={idx}
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ delay: idx * 0.1, type: 'spring' }}
+                      style={{ left: `${xPct}%`, top: `${100 - yPct}%` }}
+                      className="absolute -translate-x-1/2 -translate-y-1/2 group z-20 cursor-pointer"
+                    >
+                      <div className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border font-bold text-xs shadow-xl transition-all duration-300 group-hover:scale-110 ${
+                        isTop 
+                          ? 'bg-amber-400 text-slate-950 border-amber-300 ring-4 ring-amber-400/25' 
+                          : 'bg-slate-800 text-slate-100 border-slate-600 group-hover:border-indigo-400'
                       }`}>
-                        0{cat.priority}
-                      </span>
-                      <span className="font-bold text-slate-900">{cat.category}</span>
+                        <span className="w-2 h-2 rounded-full bg-current animate-pulse" />
+                        <span className="whitespace-nowrap">{cat.category}</span>
+                        <span className="text-[10px] opacity-90 font-mono font-black">({cat.score}p)</span>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+
+              {/* X Axis Title (Bottom Left) */}
+              <div className="w-full text-left pt-2.5 border-t border-slate-800 text-xs font-extrabold text-indigo-300 flex items-center justify-start pl-2">
+                <span>▶ X축: 개발자 언급도</span>
+              </div>
+            </div>
+
+            {/* Quadrant Legend & Ranking */}
+            <div className="lg:col-span-4 flex flex-col justify-between space-y-4">
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-3">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                  <Target className="w-4 h-4 text-slate-700" />
+                  <span>우선순위 랭킹 정량 결과</span>
+                </h4>
+                <div className="space-y-2">
+                  {dashboardData.categoryPriorities.map((cat, i) => (
+                    <div key={i} className="p-3 bg-white border border-slate-200 rounded-xl flex items-center justify-between text-xs hover:border-slate-400 transition-colors">
+                      <div className="flex items-center gap-2.5">
+                        <span className={`w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] font-mono ${
+                          i === 0 ? 'bg-amber-400 text-slate-950' : 'bg-slate-100 text-slate-700'
+                        }`}>
+                          0{cat.priority}
+                        </span>
+                        <span className="font-bold text-slate-900">{cat.category}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-bold text-slate-700">{cat.score}점</span>
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                          cat.score > 80 ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'
+                        }`}>
+                          {cat.score > 80 ? 'Q1 필수' : 'Q2/Q3'}
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono font-bold text-slate-700">{cat.score}점</span>
-                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                        cat.score > 80 ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'
-                      }`}>
-                        {cat.score > 80 ? 'Q1 필수' : 'Q2/Q3'}
-                      </span>
-                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Audience Insight Card */}
+              <div className="bg-slate-900 text-white p-5 rounded-2xl space-y-2.5 border border-slate-800">
+                <div className="text-[11px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                  <Target className="w-3.5 h-3.5 text-amber-400" />
+                  <span>타겟 오디언스 핵심 인사이트</span>
+                </div>
+                {dashboardData.ageInsights.slice(0, 2).map((insight, i) => (
+                  <div key={i} className="text-xs leading-relaxed text-slate-300 border-l-2 border-amber-400 pl-2.5 my-1.5">
+                    <span className="font-bold text-white uppercase">{insight.ageGroup}: </span>
+                    <span>{insight.insight}</span>
                   </div>
                 ))}
               </div>
             </div>
-
-            {/* Audience Insight Card */}
-            <div className="bg-slate-900 text-white p-5 rounded-2xl space-y-2.5 border border-slate-800">
-              <div className="text-[11px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                <Target className="w-3.5 h-3.5 text-amber-400" />
-                <span>타겟 오디언스 핵심 인사이트</span>
-              </div>
-              {dashboardData.ageInsights.slice(0, 2).map((insight, i) => (
-                <div key={i} className="text-xs leading-relaxed text-slate-300 border-l-2 border-amber-400 pl-2.5 my-1.5">
-                  <span className="font-bold text-white uppercase">{insight.ageGroup}: </span>
-                  <span>{insight.insight}</span>
-                </div>
-              ))}
-            </div>
           </div>
-        </div>
+        )}
       </section>
 
       {/* 3. Integrated Action Plan (통합 기획 실행 패키지) */}

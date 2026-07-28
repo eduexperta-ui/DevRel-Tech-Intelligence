@@ -655,6 +655,8 @@ const App: React.FC = () => {
                   notionUrl={notionUrl}
                   copyStatus={copyStatus}
                   isSavingToNotion={isSavingToNotion}
+                  period={period}
+                  dataSources={dataSources}
                   onCopy={handleCopy}
                   onDownload={handleDownload}
                   onSaveToNotion={handleSaveToNotion}

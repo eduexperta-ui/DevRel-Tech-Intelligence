@@ -40,12 +40,12 @@ DevRel 담당자, 테크 리더, 개발자 교육 기획자가 즉시 실행할 
 
 [분석 요청 사항]
 오늘 기준일: ${currentDateStr}
-대상 기간: ${period} (실제 최근 ${period} 이내에 발행된 글 중심)
+수집 대상 기간: ${period} (실제 최근 ${period} 이내에 발행된 기술 포스트 및 공식 블로그 수집)
 관심 기술 카테고리: ${selectedCategories.join(', ')}
 타겟 오디언스: ${targetAges.join(', ')}
 분석 목적: ${purpose}
 사용자 입력 추가 키워드: ${userTypedKeyword ? `"${userTypedKeyword}" (사용자가 입력한 특정 검색 단어)` : '없음 (추가 입력 단어 없음)'}
-분석 데이터 수: ${articleCount}개
+데이터 수집 및 요약 깊이: 선택된 기간(${period}) 내 검색 결과 중 신뢰도 높은 최신 테크 원문 10~20건 자동 탐색 및 깊이 있는 교차 검증
 
 ${userTypedKeyword 
   ? `[키워드 가중치 지침] 사용자가 직접 지정한 키워드 "${userTypedKeyword}"에 대한 최신 사례 및 연관 기술 동향을 최우선적으로 탐색하여 분석 리포트에 비중 있게 반영하라.`
