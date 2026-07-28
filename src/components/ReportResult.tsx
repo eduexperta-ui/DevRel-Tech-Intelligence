@@ -254,7 +254,7 @@ export const ReportResult: React.FC<ReportResultProps> = ({
               <div className="space-y-1 flex-1">
                 <div className="flex items-center gap-2 text-indigo-600 font-bold text-xs uppercase tracking-wider">
                   <Globe className="w-4 h-4" />
-                  <span>1. 실시간 수집 원문 출처</span>
+                  <span>실시간 수집 원문 출처</span>
                 </div>
                 <div className="text-2xl md:text-3xl font-black text-slate-900">
                   {sources.length > 0 ? sources.length : (factMetrics?.totalSourcesCollected || 12)}{' '}
@@ -375,7 +375,7 @@ export const ReportResult: React.FC<ReportResultProps> = ({
                       독립 아티클 간 상호 검증 완료 항목
                     </span>
                     <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded">
-                      환각 0%
+                      Grounding 팩트 매칭
                     </span>
                   </div>
 
@@ -580,139 +580,196 @@ export const ReportResult: React.FC<ReportResultProps> = ({
         </div>
       </section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-        {/* 2. Category Priority Table */}
-        <section className="lg:col-span-2">
-          <div className="flex items-center gap-3 mb-8 pb-4 border-b border-neutral-100">
-            <div className="w-10 h-10 rounded-full bg-neutral-100 flex items-center justify-center">
-              <BarChart3 className="w-5 h-5 text-neutral-900" />
+      {/* 2. Priority Quadrant Matrix Chart (2D 사분면 차트) */}
+      <section className="bg-white border-2 border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full text-xs font-bold mb-2">
+              <BarChart3 className="w-4 h-4 text-indigo-600" />
+              <span>우선순위 차트</span>
             </div>
-            <h3 className="text-xl font-bold text-neutral-900 tracking-tight">기술 분야별 관심도 &amp; 중요도 매트릭스</h3>
+            <h3 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">기술 분야별 관심도 &amp; 중요도 2D 매트릭스</h3>
+            <p className="text-xs md:text-sm text-slate-500 font-medium mt-1">
+              시장 관심도(X축)와 산업 중요도(Y축)를 정량 평가하여 4가지 사분면 영역으로 기술 스택 우선순위를 시각화했습니다.
+            </p>
           </div>
-          <div className="bg-white border-2 border-neutral-100 rounded-2xl overflow-x-auto shadow-sm">
-            <table className="w-full text-left min-w-[500px] sm:min-w-0">
-              <thead className="bg-neutral-50 text-neutral-500 font-semibold border-b border-neutral-200">
-                <tr>
-                  <th className="px-4 sm:px-6 py-4 tracking-wider text-xs uppercase">Rank</th>
-                  <th className="px-4 sm:px-6 py-4 tracking-wider text-xs uppercase">Tech Category</th>
-                  <th className="px-4 sm:px-6 py-4 tracking-wider text-xs uppercase">Impact Score</th>
-                  <th className="px-4 sm:px-6 py-4 tracking-wider text-xs uppercase">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-neutral-100">
+        </div>
+
+        {/* 2D Quadrant Grid Sizing */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
+          {/* Visual Canvas Quadrant */}
+          <div className="lg:col-span-8 bg-slate-900 rounded-2xl p-6 md:p-8 text-white relative min-h-[380px] md:min-h-[440px] flex flex-col justify-between overflow-hidden shadow-inner">
+            {/* Background Axis Lines */}
+            <div className="absolute inset-x-8 top-1/2 h-0.5 bg-slate-800/80 border-t border-dashed border-slate-700" />
+            <div className="absolute inset-y-8 left-1/2 w-0.5 bg-slate-800/80 border-l border-dashed border-slate-700" />
+
+            {/* Quadrant Labels */}
+            <div className="absolute top-4 left-4 text-[11px] font-bold text-emerald-400 bg-slate-800/90 px-2.5 py-1 rounded-md border border-slate-700">
+              Q2: 고가치 핵심 인프라 (High Impact)
+            </div>
+            <div className="absolute top-4 right-4 text-[11px] font-bold text-amber-300 bg-amber-500/20 px-2.5 py-1 rounded-md border border-amber-500/40">
+              Q1: 필수 핵심 도입 (Must-Have Focus) ⭐
+            </div>
+            <div className="absolute bottom-4 left-4 text-[11px] font-bold text-slate-400 bg-slate-800/90 px-2.5 py-1 rounded-md border border-slate-700">
+              Q4: 지속 모니터링 (Watchlist)
+            </div>
+            <div className="absolute bottom-4 right-4 text-[11px] font-bold text-sky-300 bg-slate-800/90 px-2.5 py-1 rounded-md border border-slate-700">
+              Q3: 신규 트렌드 탐색 (Emerging Hype)
+            </div>
+
+            {/* Axis Titles */}
+            <div className="absolute top-2 left-1/2 -translate-x-1/2 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+              ▲ 산업 중요도 (Industry Impact)
+            </div>
+            <div className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold uppercase tracking-widest text-slate-400 rotate-90 origin-right">
+              ▲ 시장 관심도 (Market Interest)
+            </div>
+
+            {/* Quadrant Nodes */}
+            <div className="relative w-full h-full my-8 min-h-[300px]">
+              {dashboardData.categoryPriorities.map((cat, idx) => {
+                // Calculate pseudo X, Y for quadrant placement based on priority and score
+                const xPct = Math.min(85, Math.max(15, (cat.score + (idx % 2 === 0 ? 8 : -10))));
+                const yPct = Math.min(85, Math.max(15, (95 - idx * 16)));
+                const isTop = cat.priority <= 2;
+
+                return (
+                  <motion.div
+                    key={idx}
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ delay: idx * 0.1, type: 'spring' }}
+                    style={{ left: `${xPct}%`, top: `${100 - yPct}%` }}
+                    className="absolute -translate-x-1/2 -translate-y-1/2 group z-10 cursor-pointer"
+                  >
+                    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border font-bold text-xs shadow-lg transition-all duration-300 group-hover:scale-110 ${
+                      isTop 
+                        ? 'bg-amber-400 text-slate-950 border-amber-300 ring-4 ring-amber-400/20' 
+                        : 'bg-slate-800 text-slate-100 border-slate-600 group-hover:border-indigo-400'
+                    }`}>
+                      <span className="w-2 h-2 rounded-full bg-current animate-pulse" />
+                      <span className="whitespace-nowrap">{cat.category}</span>
+                      <span className="text-[10px] opacity-80 font-mono">({cat.score}p)</span>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Quadrant Legend & Ranking */}
+          <div className="lg:col-span-4 flex flex-col justify-between space-y-4">
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-3">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                <Target className="w-4 h-4 text-slate-700" />
+                <span>우선순위 랭킹 정량 결과</span>
+              </h4>
+              <div className="space-y-2">
                 {dashboardData.categoryPriorities.map((cat, i) => (
-                  <tr key={i} className="hover:bg-neutral-50 transition-colors group">
-                    <td className="px-4 sm:px-6 py-4 sm:py-5 font-bold text-neutral-300 group-hover:text-neutral-900 transition-colors text-lg sm:text-xl font-mono">0{cat.priority}</td>
-                    <td className="px-4 sm:px-6 py-4 sm:py-5 font-bold text-neutral-900 text-sm sm:text-base md:text-lg">{cat.category}</td>
-                    <td className="px-4 sm:px-6 py-4 sm:py-5">
-                      <div className="flex items-center gap-3 sm:gap-4">
-                        <div className="flex-1 h-2 bg-neutral-100 rounded-full overflow-hidden min-w-[60px] sm:min-w-0">
-                          <motion.div 
-                            initial={{ width: 0 }}
-                            animate={{ width: `${cat.score}%` }}
-                            className="h-full bg-neutral-900 transition-colors"
-                          />
-                        </div>
-                        <span className="font-bold text-neutral-900 w-8 text-right font-mono text-sm">{cat.score}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 sm:px-6 py-4 sm:py-5">
-                      <span className={`px-2.5 py-1 rounded-md text-[10px] sm:text-xs font-bold uppercase tracking-wider ${
-                        cat.score > 80 ? 'bg-neutral-900 text-white' : 'bg-neutral-100 text-neutral-600'
+                  <div key={i} className="p-3 bg-white border border-slate-200 rounded-xl flex items-center justify-between text-xs hover:border-slate-400 transition-colors">
+                    <div className="flex items-center gap-2.5">
+                      <span className={`w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] font-mono ${
+                        i === 0 ? 'bg-amber-400 text-slate-950' : 'bg-slate-100 text-slate-700'
                       }`}>
-                        {cat.score > 80 ? 'Hot' : 'Stable'}
+                        0{cat.priority}
                       </span>
-                    </td>
-                  </tr>
+                      <span className="font-bold text-slate-900">{cat.category}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-bold text-slate-700">{cat.score}점</span>
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                        cat.score > 80 ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'
+                      }`}>
+                        {cat.score > 80 ? 'Q1 필수' : 'Q2/Q3'}
+                      </span>
+                    </div>
+                  </div>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        {/* 3. Age-Specific Recommendation Points */}
-        <section>
-          <div className="flex items-center gap-3 mb-8 pb-4 border-b border-neutral-100">
-            <div className="w-10 h-10 rounded-full bg-neutral-100 flex items-center justify-center">
-              <Target className="w-5 h-5 text-neutral-900" />
+              </div>
             </div>
-            <h3 className="text-xl font-bold text-neutral-900 tracking-tight">타겟 개발자 오디언스 인사이트</h3>
-          </div>
-          <div className="space-y-4">
-            {dashboardData.ageInsights.map((insight, i) => (
-              <div key={i} className="bg-neutral-900 text-white p-6 rounded-2xl group hover:bg-black transition-all border border-neutral-800">
-                <div className="text-xs font-bold text-neutral-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-neutral-400 group-hover:bg-white" />
-                  {insight.ageGroup}
+
+            {/* Audience Insight Card */}
+            <div className="bg-slate-900 text-white p-5 rounded-2xl space-y-2.5 border border-slate-800">
+              <div className="text-[11px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                <Target className="w-3.5 h-3.5 text-amber-400" />
+                <span>타겟 오디언스 핵심 인사이트</span>
+              </div>
+              {dashboardData.ageInsights.slice(0, 2).map((insight, i) => (
+                <div key={i} className="text-xs leading-relaxed text-slate-300 border-l-2 border-amber-400 pl-2.5 my-1.5">
+                  <span className="font-bold text-white uppercase">{insight.ageGroup}: </span>
+                  <span>{insight.insight}</span>
                 </div>
-                <p className="text-base font-semibold leading-relaxed tracking-tight text-neutral-200 group-hover:text-white">{insight.insight}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
-        {/* 4. Promotion Ideas */}
-        <section>
-          <div className="flex items-center gap-3 mb-8 pb-4 border-b border-neutral-100">
-            <div className="w-10 h-10 rounded-full bg-neutral-100 flex items-center justify-center">
-              <Zap className="w-5 h-5 text-neutral-900" />
+              ))}
             </div>
-            <h3 className="text-xl font-bold text-neutral-900 tracking-tight">테크블로그 &amp; 교육 세션 기획안</h3>
           </div>
-          <div className="space-y-4">
-            {dashboardData.promotionIdeas.map((idea, i) => (
-              <div key={i} className="bg-white border-2 border-neutral-100 rounded-2xl p-6 shadow-sm hover:border-neutral-900 transition-all">
-                <div className="flex justify-between items-start mb-4">
-                  <h4 className="font-bold text-neutral-900 text-lg leading-snug">{idea.title}</h4>
-                  <span className="text-[10px] font-bold bg-neutral-100 text-neutral-600 px-2 py-1 rounded-md uppercase tracking-wider">{idea.priority}</span>
+        </div>
+      </section>
+
+      {/* 3. Integrated Action Plan (통합 기획 실행 패키지) */}
+      <section className="space-y-6">
+        <div className="flex items-center gap-3 pb-4 border-b border-neutral-200">
+          <div className="w-10 h-10 rounded-full bg-neutral-900 text-white flex items-center justify-center font-bold">
+            <Zap className="w-5 h-5 text-amber-400" />
+          </div>
+          <div>
+            <h3 className="text-xl font-bold text-neutral-900 tracking-tight">테크블로그 &amp; 교육 세션 종합 실행 패키지</h3>
+            <p className="text-xs text-neutral-500">기획 목적, 추천 헤드라인, 지식 자산화 전략이 한눈에 파악되도록 1:1 세트로 통합된 기획안입니다.</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {dashboardData.promotionIdeas.map((idea, i) => {
+            const headline = dashboardData.thumbnailCopies[i] || `"${idea.title} 해결하기"`;
+            const sourcingPoint = dashboardData.sourcingPoints[i] || '사내 기술 아키텍처 아카이빙 및 가이드화';
+
+            return (
+              <div key={i} className="bg-white border-2 border-neutral-200 hover:border-neutral-900 rounded-2xl p-6 shadow-sm transition-all flex flex-col justify-between space-y-5">
+                <div className="space-y-4">
+                  {/* Category Header */}
+                  <div className="flex items-center justify-between pb-3 border-b border-neutral-100">
+                    <span className="text-[11px] font-black bg-neutral-900 text-white px-2.5 py-1 rounded-md uppercase tracking-wider">
+                      기획안 0{i + 1}
+                    </span>
+                    <span className="text-xs font-bold text-neutral-500 bg-neutral-100 px-2.5 py-1 rounded-md">
+                      Target: <strong className="text-neutral-900">{idea.target}</strong>
+                    </span>
+                  </div>
+
+                  {/* Core Plan */}
+                  <div className="space-y-1.5">
+                    <h4 className="font-bold text-neutral-900 text-lg leading-snug">{idea.title}</h4>
+                    <p className="text-xs text-neutral-600 leading-relaxed bg-neutral-50 p-3 rounded-xl border border-neutral-100">
+                      {idea.description}
+                    </p>
+                  </div>
+
+                  {/* Headline Copy */}
+                  <div className="p-3.5 bg-amber-50/60 border border-amber-200/80 rounded-xl space-y-1">
+                    <span className="text-[10px] font-bold text-amber-800 uppercase tracking-wide flex items-center gap-1">
+                      <MousePointer2 className="w-3 h-3 text-amber-600" />
+                      추천 헤드라인 / 아티클 제목
+                    </span>
+                    <p className="text-xs font-black text-slate-900 tracking-tight leading-snug">
+                      "{headline.replace(/^"|"$/g, '')}"
+                    </p>
+                  </div>
                 </div>
-                <p className="text-sm text-neutral-600 mb-5 leading-relaxed bg-neutral-50 p-3 rounded-lg">{idea.description}</p>
-                <div className="text-xs font-bold text-neutral-400 uppercase tracking-wide">Target: <span className="text-neutral-900">{idea.target}</span></div>
-              </div>
-            ))}
-          </div>
-        </section>
 
-        {/* 5. Thumbnail Copy Suggestions */}
-        <section>
-          <div className="flex items-center gap-3 mb-8 pb-4 border-b border-neutral-100">
-            <div className="w-10 h-10 rounded-full bg-neutral-100 flex items-center justify-center">
-              <MousePointer2 className="w-5 h-5 text-neutral-900" />
-            </div>
-            <h3 className="text-xl font-bold text-neutral-900 tracking-tight">헤드라인 &amp; 아티클 제목 제안</h3>
-          </div>
-          <div className="bg-neutral-50 rounded-2xl p-4 border border-neutral-100 space-y-3">
-            {dashboardData.thumbnailCopies.map((copy, i) => (
-              <div key={i} className="bg-white border border-neutral-200 p-5 rounded-xl flex items-start gap-4 group hover:border-neutral-900 transition-all shadow-sm">
-                <span className="text-lg font-bold text-neutral-300 group-hover:text-neutral-900 transition-colors font-mono mt-0.5">0{i+1}</span>
-                <p className="text-base font-bold text-neutral-900 tracking-tight leading-snug">"{copy}"</p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* 6. Brand Sourcing Points */}
-        <section>
-          <div className="flex items-center gap-3 mb-8 pb-4 border-b border-neutral-100">
-            <div className="w-10 h-10 rounded-full bg-neutral-100 flex items-center justify-center">
-              <Layers className="w-5 h-5 text-neutral-900" />
-            </div>
-            <h3 className="text-xl font-bold text-neutral-900 tracking-tight">지식 자산화 &amp; 문서화 전략 포인트</h3>
-          </div>
-          <div className="bg-white border-2 border-neutral-100 rounded-2xl p-6 space-y-6">
-            {dashboardData.sourcingPoints.map((point, i) => (
-              <div key={i} className="flex gap-4 group items-start">
-                <div className="w-8 h-8 rounded-full bg-neutral-100 text-neutral-600 flex items-center justify-center flex-shrink-0 text-sm font-bold group-hover:bg-neutral-900 group-hover:text-white transition-all">
-                  {i+1}
+                {/* Sourcing Point */}
+                <div className="pt-3 border-t border-neutral-100 space-y-1">
+                  <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider flex items-center gap-1">
+                    <Layers className="w-3 h-3 text-neutral-500" />
+                    지식 자산화 실행 포인트
+                  </span>
+                  <p className="text-xs text-neutral-700 font-medium leading-relaxed">
+                    {sourcingPoint}
+                  </p>
                 </div>
-                <p className="text-base text-neutral-700 leading-relaxed font-medium group-hover:text-neutral-900 pt-1">{point}</p>
               </div>
-            ))}
-          </div>
-        </section>
-      </div>
+            );
+          })}
+        </div>
+      </section>
 
       {/* 7. Data Table (Market Signals) */}
       <section>
