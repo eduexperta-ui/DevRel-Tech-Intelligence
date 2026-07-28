@@ -582,26 +582,25 @@ export const ReportResult: React.FC<ReportResultProps> = ({
 
       {/* 2. Priority Quadrant Matrix Chart (2D 사분면 차트) */}
       <section className="bg-white border-2 border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm space-y-6">
-        {/* Clean Header */}
+        {/* Clean Header & Axis Definition */}
         <div className="space-y-3 pb-5 border-b border-slate-100">
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full text-xs font-bold">
-              <BarChart3 className="w-4 h-4 text-indigo-600" />
-              <span>우선순위 매트릭스</span>
-            </div>
-            {/* Axis Info Chips */}
-            <div className="flex items-center gap-2 text-[11px] font-bold text-slate-600 flex-wrap">
-              <span className="px-2.5 py-1 bg-slate-100 rounded-lg border border-slate-200">
-                <strong className="text-indigo-600">X축:</strong> 개발자 언급도 (블로그·밋업·커뮤니티)
-              </span>
-              <span className="px-2.5 py-1 bg-slate-100 rounded-lg border border-slate-200">
-                <strong className="text-indigo-600">Y축:</strong> 실무 활용성 (안정성·트래픽·기여도)
-              </span>
-            </div>
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full text-xs font-bold">
+            <BarChart3 className="w-4 h-4 text-indigo-600" />
+            <span>우선순위 매트릭스</span>
           </div>
           <h3 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">
             기술 분야별 개발자 언급도 &amp; 실무 활용성 2D 매트릭스
           </h3>
+          
+          {/* Axis Definitions directly below title */}
+          <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 space-y-1">
+            <p className="leading-relaxed">
+              <strong className="text-indigo-900 font-bold">X축 (개발자 언급도):</strong> 기술 블로그, 밋업, 엔지니어링 커뮤니티 언급 빈도
+            </p>
+            <p className="leading-relaxed">
+              <strong className="text-indigo-900 font-bold">Y축 (실무 활용성):</strong> 서비스 안정성, 대용량 트래픽 대응, 아키텍처 실무 적용 가치
+            </p>
+          </div>
         </div>
 
         {/* 2D Quadrant Grid Sizing */}
@@ -612,7 +611,7 @@ export const ReportResult: React.FC<ReportResultProps> = ({
             <div className="absolute inset-x-8 top-1/2 h-0.5 bg-slate-800/80 border-t border-dashed border-slate-700" />
             <div className="absolute inset-y-8 left-1/2 w-0.5 bg-slate-800/80 border-l border-dashed border-slate-700" />
 
-            {/* Quadrant Area Badges (사분면 모서리 투명 워터마크 디자인으로 데이터 노드와 겹침 및 잘림 방지) */}
+            {/* Quadrant Area Badges (사분면 모서리 워터마크) */}
             <div className="absolute top-8 left-4 text-[11px] font-bold text-emerald-400/90 bg-slate-800/80 px-2.5 py-1 rounded-lg border border-slate-700/60 pointer-events-none z-0">
               Q2: 실무 가치 중심 (High Utility)
             </div>
@@ -629,16 +628,14 @@ export const ReportResult: React.FC<ReportResultProps> = ({
               Q3: 라이징 기술 주제 (Rising Topics)
             </div>
 
-            {/* Y Axis Title (Top Left) */}
-            <div className="absolute top-2 left-4 text-[11px] font-extrabold text-indigo-300 flex items-center gap-1 z-10">
-              <span>▲ Y축: 실무 활용성 (Practical Utility)</span>
+            {/* Y Axis Title (Top Center over Y-axis line) */}
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 text-xs font-extrabold text-indigo-300 bg-slate-950/80 px-3 py-1 rounded-full border border-indigo-500/30 flex items-center gap-1 z-10 shadow-sm">
+              <span>▲ Y축: 실무 활용성</span>
             </div>
 
             {/* Quadrant Nodes Canvas */}
             <div className="relative w-full h-full my-10 min-h-[280px]">
               {dashboardData.categoryPriorities.map((cat, idx) => {
-                // Stagger nodes evenly to prevent overlapping
-                // Q1 items (idx 0 & 1): separate positions
                 let xPct = 72;
                 let yPct = 82;
 
@@ -679,9 +676,9 @@ export const ReportResult: React.FC<ReportResultProps> = ({
             </div>
 
             {/* X Axis Title (Bottom Center) */}
-            <div className="w-full text-center pt-2 border-t border-slate-800 text-[11px] font-extrabold text-indigo-300 flex items-center justify-center gap-2">
-              <span>▶ X축: 개발자 언급도 (Developer Focus Score)</span>
-              <span className="text-[10px] text-slate-500 font-mono">(0pt ─────────▶ 100pt)</span>
+            <div className="w-full text-center pt-2 border-t border-slate-800 text-xs font-extrabold text-indigo-300 flex items-center justify-center gap-2">
+              <span>▶ X축: 개발자 언급도</span>
+              <span className="text-[10px] text-slate-500 font-mono font-normal">(0pt ─────────▶ 100pt)</span>
             </div>
           </div>
 
