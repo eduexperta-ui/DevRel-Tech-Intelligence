@@ -3,7 +3,7 @@ import express from 'express';
 import { GoogleGenAI } from '@google/genai';
 import { Client } from '@notionhq/client';
 import path from 'path';
-import { getTrendAnalysisPrompt } from './src/services/promptService';
+import { getTrendAnalysisPrompt } from './src/services/promptService.js';
 
 // Main Express Application Entry Point
 export const app = express();
@@ -160,13 +160,11 @@ app.get(['/api/config-check', '/config-check'], (req, res) => {
 
   const normalizedNotionDbId = extractNotionId(notionDbIdRaw);
   const notionDbIdFormatValid = /^[a-f0-9]{32}$/i.test(normalizedNotionDbId);
-  const notionDbUrl = notionDbIdFormatValid ? `https://www.notion.so/${normalizedNotionDbId}` : null;
 
   res.json({
     notionApiKeyPresent: !!notionApiKey,
     notionDbIdPresent: !!notionDbIdRaw,
     notionDbIdFormatValid,
-    notionDbUrl,
     geminiApiKeyPresent: !!geminiApiKey,
     nodeEnv: process.env.NODE_ENV,
     debug: {
@@ -237,16 +235,13 @@ app.post(['/api/analyze', '/analyze'], async (req, res) => {
 
     const candidateModels = [
       'gemini-3.6-flash',
-      'gemini-3.1-flash-lite',
-      'gemini-flash-latest'
+      'gemini-3.6-flash',
     ];
 
     let response: any = null;
     let lastError: any = null;
     let usedModel: string | null = null;
-    let fallbackSources: any[] = [];
 
-    // Attempt Tier 1: Search Grounding with Candidate Models
     for (const modelName of candidateModels) {
       try {
         const result = await ai.models.generateContent({
@@ -256,129 +251,23 @@ app.post(['/api/analyze', '/analyze'], async (req, res) => {
         });
 
         response = result;
-        usedModel = `${modelName} (Search Grounded)`;
+        usedModel = modelName;
         lastError = null;
         break;
       } catch (err: any) {
-        console.warn(`[Gemini Grounded] model failed: ${modelName}`, err?.message || err);
+        console.warn(`[Gemini] model failed: ${modelName}`, err?.message || err);
         lastError = err;
       }
     }
 
-    // Attempt Tier 2: Standard Model call without search tool (if grounding tool hits rate limits)
-    if (!response) {
-      console.log('[Gemini] Retrying standard models without grounding tool...');
-      const standardConfig = {
-        systemInstruction: config.systemInstruction,
-        temperature: 0.2,
-        seed: 42,
-      };
-
-      for (const modelName of candidateModels) {
-        try {
-          const result = await ai.models.generateContent({
-            model: modelName,
-            contents: { parts },
-            config: standardConfig,
-          });
-
-          response = result;
-          usedModel = `${modelName} (Standard)`;
-          lastError = null;
-          break;
-        } catch (err: any) {
-          console.warn(`[Gemini Standard] model failed: ${modelName}`, err?.message || err);
-          lastError = err;
-        }
-      }
-    }
-
-    // Attempt Tier 3: Quota (429) Fallback Synthesizer if all Gemini API quota limits hit
     if (!response) {
       const rawMessage = String(lastError?.message || lastError || '').toLowerCase();
-      const isQuotaError = rawMessage.includes('quota') || rawMessage.includes('429') || rawMessage.includes('resource exhausted');
-
-      if (isQuotaError) {
-        console.warn('[Gemini] All models hit 429 Rate Limit / Quota. Applying DevRel Intelligence Quota Fallback Mode.');
-        const catText = selectedCategories.length > 0 ? selectedCategories.join(', ') : '백엔드 / MSA, 클라우드 / DevOps';
-        const targetText = targetAges.length > 0 ? targetAges.join(', ') : '시니어 / 리드';
-        const kwText = keyword ? `(핵심 검색어: ${keyword})` : '';
-
-        const fallbackReportText = `# 🚀 DevRel Tech Intelligence 분석 보고서
-
-> **[시스템 안내]** 현재 외부 Gemini API 서치 라이브 쿼터(429 Rate Limit)가 한도에 도달하여, 사전 통합된 **DevRel Intelligence Engine v2.4**의 지식 맵을 활용하여 최신 네카라쿠배당토 및 빅테크 트렌드 리포트를 즉시 합성 생성했습니다.
-
----
-
-## 1. 📊 핵심 기술 트렌드 요약 (${period})
-- **분석 테크 카테고리**: ${catText} ${kwText}
-- **핵심 타깃 레이어**: ${targetText}
-- **분석 및 기획 목적**: ${purpose}
-
-### 💡 [주요 트렌드 1] 대규모 트래픽 처리 아키텍처 및 분산 관찰 가능성(Observability)
-- **현황**: 네이버, 카카오, 토스 등 대표 기업들이 OpenTelemetry 기반 트레이싱/메트릭 수집 표준화를 급속도로 진행 중입니다.
-- **핵심 인사이트**: 서비스 메시(Service Mesh) 및 eBPF 기반 커널 레이어 패킷 트래킹을 통한 MSA 서비스 병목 진단 사례가 아티클의 핵심 이슈로 부상했습니다.
-
-### 💡 [주요 트렌드 2] 클라우드 인프라 효율화 (FinOps) & FinOps 자동화
-- **현황**: AWS/GCP 멀티 클라우드 환경에서 Kubernetes Karpenter 및 Spot Instance 인텔리전스 자동 스케일링 적용 사례가 활발합니다.
-- **핵심 인사이트**: 인프라 비용 절감과 서비스 가용성을 동시에 보장하는 아키텍처 회고 글들이 개발자 커뮤니티(Velog, GeekNews)에서 높은 호응을 얻고 있습니다.
-
----
-
-## 2. 🎯 DevRel 실행 및 콘텐츠 기획안 (${purpose})
-
-### 📝 1) 테크 블로그 / 기술 아티클 기획
-1. **"${catText} 실무진이 경험한 초대형 트래픽 서비스 장애 회고 및 복구기"**
-   - **타깃**: ${targetText}
-   - **핵심 내용**: Kafka 큐 스파이크 대응, DB Read Replica 확장 및 서킷 브레이커 적용 사례
-2. **"주니어 개발자를 위한 OpenTelemetry 관찰 가능성(Observability) 입문 가이드"**
-   - **타깃**: 주니어 개발자 / 백엔드 엔지니어
-
-### 🎙️ 2) 밋업 및 엔지니어링 세션 기획
-- **행사 세션**: **${catText} Tech Meetup &amp; Insights**
-- **아젠다 주제**:
-  - Part 1: 레거시 Monolith에서 Event-Driven Architecture로의 안전한 전환
-  - Part 2: 시니어 엔지니어 패널 토크 - "기술 부채를 줄이는 리팩토링 전략"
-
----
-
-## 3. 🛡️ 팩트 검증 및 참고 기술 출처
-- **주요 출처**: 네이버 D2, 카카오 테크, 토스 테크, 당근 테크 블로그, Google Engineering, Hacker News, Velog 핫 이슈
-- **상태**: 팩트 검증 완료 및 DevRel 액션 아이템 구조화 완료`;
-
-        fallbackSources = [
-          { title: '네이버 D2 기술 블로그 - 대용량 트랜잭션 아키텍처', uri: 'https://d2.naver.com' },
-          { title: '토스 테크 블로그 - Microservices Observability', uri: 'https://toss.tech' },
-          { title: '카카오 AI & Infrastructure 기술 공유', uri: 'https://tech.kakao.com' },
-          { title: 'Hacker News Top Tech Discussions', uri: 'https://news.ycombinator.com' },
-          { title: 'GeekNews 기술 동향 및 이슈 정보', uri: 'https://news.hada.io' }
-        ];
-
-        return res.json({
-          text: fallbackReportText,
-          sources: fallbackSources,
-          factMetrics: {
-            totalSourcesCollected: 5,
-            searchQueriesExecuted: [
-              `${catText} 최신 아티클`,
-              `네카라쿠배당토 ${purpose}`
-            ],
-            factCheckConfidenceScore: 98.5,
-            crossValidationSourcesCount: 5,
-            dataVolumeEstKb: 168
-          },
-          usedModel: 'DevRel Intelligence Synthesizer (Quota Recovery)',
-          isQuotaFallback: true
-        });
-      }
-
-      const rawMessage2 = String(lastError?.message || lastError || '').toLowerCase();
 
       if (
-        rawMessage2.includes('not found') ||
-        rawMessage2.includes('404') ||
-        rawMessage2.includes('model') ||
-        rawMessage2.includes('unsupported')
+        rawMessage.includes('not found') ||
+        rawMessage.includes('404') ||
+        rawMessage.includes('model') ||
+        rawMessage.includes('unsupported')
       ) {
         return res.status(500).json({
           error: 'Gemini 모델명 또는 API 요청 대상이 올바르지 않습니다.',
@@ -387,14 +276,25 @@ app.post(['/api/analyze', '/analyze'], async (req, res) => {
       }
 
       if (
-        rawMessage2.includes('api key') ||
-        rawMessage2.includes('api_key_invalid') ||
-        rawMessage2.includes('permission denied') ||
-        rawMessage2.includes('unauthorized') ||
-        rawMessage2.includes('403')
+        rawMessage.includes('api key') ||
+        rawMessage.includes('api_key_invalid') ||
+        rawMessage.includes('permission denied') ||
+        rawMessage.includes('unauthorized') ||
+        rawMessage.includes('403')
       ) {
         return res.status(500).json({
           error: 'Gemini API 키가 유효하지 않거나 권한이 없습니다.',
+          debug: lastError?.message || String(lastError),
+        });
+      }
+
+      if (
+        rawMessage.includes('quota') ||
+        rawMessage.includes('429') ||
+        rawMessage.includes('resource exhausted')
+      ) {
+        return res.status(500).json({
+          error: 'Gemini API 사용량이 초과되었습니다. 잠시 후 다시 시도해주세요.',
           debug: lastError?.message || String(lastError),
         });
       }
@@ -405,53 +305,9 @@ app.post(['/api/analyze', '/analyze'], async (req, res) => {
       });
     }
 
-    const groundingMetadata = response.candidates?.[0]?.groundingMetadata || response.groundingMetadata || {};
-    const groundingChunks = groundingMetadata.groundingChunks || [];
-    const webQueries = groundingMetadata.webSearchQueries || [];
-
-    const extractedSources = groundingChunks
-      .map((chunk: any) => {
-        if (chunk?.web) {
-          return {
-            title: chunk.web.title || '참조 아티클 출처',
-            uri: chunk.web.uri || '#',
-            snippet: chunk.web.snippet || '',
-          };
-        }
-        return null;
-      })
-      .filter((s: any) => s && s.uri && s.uri !== '#');
-
-    // 중복 URL 제거
-    const uniqueSourcesMap = new Map();
-    extractedSources.forEach((s: any) => {
-      if (!uniqueSourcesMap.has(s.uri)) {
-        uniqueSourcesMap.set(s.uri, s);
-      }
-    });
-    let uniqueSources = Array.from(uniqueSourcesMap.values());
-
-    if (uniqueSources.length === 0) {
-      uniqueSources = [
-        { title: '네이버 D2 기술 블로그 - 대용량 트랜잭션 및 인프라 아키텍처', uri: 'https://d2.naver.com' },
-        { title: '토스 테크 블로그 - Microservices Observability & Frontend', uri: 'https://toss.tech' },
-        { title: '카카오 AI & Infrastructure 기술 공유 블로그', uri: 'https://tech.kakao.com' },
-        { title: '당근 엔지니어링 - 서비스 장애 회고 및 아키텍처', uri: 'https://medium.com/daangn' },
-        { title: 'GeekNews 최신 IT 기술 동향 및 개발자 이슈', uri: 'https://news.hada.io' }
-      ];
-    }
-
     return res.json({
       text: response.text,
-      sources: uniqueSources,
-      factMetrics: {
-        totalSourcesCollected: uniqueSources.length,
-        searchQueriesExecuted: webQueries,
-        factCheckConfidenceScore: uniqueSources.length > 0 ? Math.min(99, 90 + uniqueSources.length * 1.2) : 95.0,
-        crossValidationSourcesCount: Math.max(1, Math.floor(uniqueSources.length * 0.8)),
-        dataVolumeEstKb: Math.floor(120 + (response.text?.length || 0) / 10),
-      },
-      groundingMetadata,
+      ...response,
       usedModel,
     });
   } catch (error: any) {
@@ -583,7 +439,7 @@ app.post(['/api/save-to-notion', '/save-to-notion'], async (req, res) => {
             {
               type: 'text',
               text: {
-                content: `이 리포트는 ${period || '선택 기간'} 동안의 데이터를 바탕으로 생성된 DevRel Tech Intelligence 브리프입니다.`,
+                content: `이 리포트는 ${period || '선택 기간'} 동안의 데이터를 바탕으로 생성된 마켓 인텔리전스입니다.`,
               },
             },
           ],
