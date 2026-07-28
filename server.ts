@@ -14,15 +14,6 @@ const PORT = 3000;
 const cleanEnv = (value: string | undefined) =>
   (value || '').trim().replace(/^[\"\']|[\"\']$/g, '');
 
-const getGeminiApiKey = () => 
-  cleanEnv(process.env.GEMINI_API_KEY || process.env.Gemini_API_Key || process.env.GEMINI_KEY || process.env.VITE_GEMINI_API_KEY);
-
-const getNotionApiKey = () =>
-  cleanEnv(process.env.NOTION_API_KEY || process.env.NOTION_TOKEN || process.env.NOTION_KEY || process.env.VITE_NOTION_API_KEY);
-
-const getNotionDatabaseId = () =>
-  cleanEnv(process.env.NOTION_DATABASE_ID || process.env.NOTION_DB_ID || process.env.VITE_NOTION_DATABASE_ID);
-
 const extractNotionId = (input: string) => {
   const match = input.match(
     /[a-f0-9]{32}|[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/i
@@ -163,9 +154,9 @@ app.get(['/api/health', '/health'], (req, res) => {
 });
 
 app.get(['/api/config-check', '/config-check'], (req, res) => {
-  const notionApiKey = getNotionApiKey();
-  const notionDbIdRaw = getNotionDatabaseId();
-  const geminiApiKey = getGeminiApiKey();
+  const notionApiKey = cleanEnv(process.env.NOTION_API_KEY);
+  const notionDbIdRaw = cleanEnv(process.env.NOTION_DATABASE_ID);
+  const geminiApiKey = cleanEnv(process.env.Gemini_API_Key);
 
   const normalizedNotionDbId = extractNotionId(notionDbIdRaw);
   const notionDbIdFormatValid = /^[a-f0-9]{32}$/i.test(normalizedNotionDbId);
@@ -184,7 +175,6 @@ app.get(['/api/config-check', '/config-check'], (req, res) => {
       normalizedNotionDbIdPreview: normalizedNotionDbId
         ? `${normalizedNotionDbId.slice(0, 8)}...`
         : 'invalid',
-      geminiApiKeyStatus: geminiApiKey ? 'exists' : 'missing-or-empty',
     },
   });
 });
@@ -202,11 +192,11 @@ app.post(['/api/analyze', '/analyze'], async (req, res) => {
       imageBase64,
     } = req.body;
 
-    const apiKey = getGeminiApiKey();
+    const apiKey = cleanEnv(process.env.Gemini_API_Key);
 
     if (!apiKey) {
       return res.status(500).json({
-        error: 'GEMINI_API_KEY가 서버(Vercel 환경변수)에 설정되지 않았습니다. Vercel 설정에서 GEMINI_API_KEY를 등록하고 Redeploy 해주세요.',
+        error: 'GEMINI_API_KEY가 서버에 설정되지 않았습니다.',
       });
     }
 
@@ -477,8 +467,8 @@ app.post(['/api/save-to-notion', '/save-to-notion'], async (req, res) => {
   try {
     const { markdown, period, categories, targetAges, purpose, notionPayload } = req.body;
 
-    const notionApiKey = getNotionApiKey();
-    const notionDbIdRaw = getNotionDatabaseId();
+    const notionApiKey = cleanEnv(process.env.NOTION_API_KEY);
+    const notionDbIdRaw = cleanEnv(process.env.NOTION_DATABASE_ID);
     const notionDbId = extractNotionId(notionDbIdRaw);
 
     if (!notionApiKey || !notionDbIdRaw) {
@@ -509,12 +499,11 @@ app.post(['/api/save-to-notion', '/save-to-notion'], async (req, res) => {
     }
 
     const blocks = parseMarkdownToNotionBlocks(contentToParse);
+
     const nowIso = new Date().toISOString();
 
     const titleValue =
       payloadProps?.Title ||
-      payloadProps?.Name ||
-      payloadProps?.이름 ||
       `[${period || '기간 미지정'}] ${categories || '전체'} 트렌드 분석 - ${
         purpose || '트렌드 분석'
       } (${targetAges || '전체'})`;
@@ -524,78 +513,66 @@ app.post(['/api/save-to-notion', '/save-to-notion'], async (req, res) => {
     const tValue = payloadProps?.TargetAges || targetAges || '전체';
     const purpValue = payloadProps?.Purpose || purpose || '트렌드 분석';
 
-    // Retrieve database schema dynamically to detect exact column names (e.g., Name vs Title vs 이름)
-    let dbPropertiesSchema: Record<string, any> = {};
-    let titlePropKey = 'Title';
-
-    try {
-      const db = await notion.databases.retrieve({ database_id: notionDbId }) as any;
-      dbPropertiesSchema = db.properties || {};
-      for (const [key, prop] of Object.entries(dbPropertiesSchema)) {
-        if ((prop as any).type === 'title') {
-          titlePropKey = key;
-          break;
-        }
-      }
-    } catch (dbErr: any) {
-      console.warn('Notion DB retrieve schema warning:', dbErr.message);
-    }
-
-    const mappedProps: Record<string, any> = {};
-    mappedProps[titlePropKey] = {
-      title: [
-        {
-          type: 'text',
-          text: {
-            content: String(titleValue).substring(0, 2000),
+    const properties: Record<string, any> = {
+      Title: {
+        title: [
+          {
+            type: 'text',
+            text: {
+              content: String(titleValue).substring(0, 2000),
+            },
           },
+        ],
+      },
+      Period: {
+        rich_text: [
+          {
+            type: 'text',
+            text: {
+              content: String(pValue).substring(0, 2000),
+            },
+          },
+        ],
+      },
+      Categories: {
+        rich_text: [
+          {
+            type: 'text',
+            text: {
+              content: String(cValue).substring(0, 2000),
+            },
+          },
+        ],
+      },
+      TargetAges: {
+        rich_text: [
+          {
+            type: 'text',
+            text: {
+              content: String(tValue).substring(0, 2000),
+            },
+          },
+        ],
+      },
+      Purpose: {
+        rich_text: [
+          {
+            type: 'text',
+            text: {
+              content: String(purpValue).substring(0, 2000),
+            },
+          },
+        ],
+      },
+      Date: {
+        date: {
+          start: nowIso,
         },
-      ],
+      },
     };
 
-    if (Object.keys(dbPropertiesSchema).length > 0) {
-      const tryMapTextProp = (targetKeys: string[], val: string) => {
-        if (!val) return;
-        for (const k of targetKeys) {
-          const matchedKey = Object.keys(dbPropertiesSchema).find(
-            (sk) => sk.toLowerCase() === k.toLowerCase()
-          );
-          if (matchedKey && dbPropertiesSchema[matchedKey]?.type === 'rich_text') {
-            mappedProps[matchedKey] = {
-              rich_text: [{ type: 'text', text: { content: String(val).substring(0, 2000) } }],
-            };
-            break;
-          }
-        }
-      };
-
-      const tryMapDateProp = (targetKeys: string[], dateIso: string) => {
-        for (const k of targetKeys) {
-          const matchedKey = Object.keys(dbPropertiesSchema).find(
-            (sk) => sk.toLowerCase() === k.toLowerCase()
-          );
-          if (matchedKey && dbPropertiesSchema[matchedKey]?.type === 'date') {
-            mappedProps[matchedKey] = { date: { start: dateIso } };
-            break;
-          }
-        }
-      };
-
-      tryMapTextProp(['Period', '기간', '분석기간'], pValue);
-      tryMapTextProp(['Categories', '카테고리', '분석카테고리'], cValue);
-      tryMapTextProp(['TargetAges', '타겟연령', '타겟'], tValue);
-      tryMapTextProp(['Purpose', '목적', '분석목적'], purpValue);
-      tryMapDateProp(['Date', '날짜', '생성일'], nowIso);
-    } else {
-      // Fallback property mapping if schema retrieval didn't return properties
-      mappedProps['Period'] = { rich_text: [{ type: 'text', text: { content: String(pValue) } }] };
-      mappedProps['Categories'] = { rich_text: [{ type: 'text', text: { content: String(cValue) } }] };
-      mappedProps['TargetAges'] = { rich_text: [{ type: 'text', text: { content: String(tValue) } }] };
-      mappedProps['Purpose'] = { rich_text: [{ type: 'text', text: { content: String(purpValue) } }] };
-      mappedProps['Date'] = { date: { start: nowIso } };
-    }
-
-    console.log('Prepared Notion mapped properties:', JSON.stringify(mappedProps, null, 2));
+    console.log('Hardcoded Notion properties:', JSON.stringify(properties, null, 2));
+    console.log('Parsed block count:', blocks.length);
 
     const firstBlockChildren = [
       {
@@ -625,7 +602,7 @@ app.post(['/api/save-to-notion', '/save-to-notion'], async (req, res) => {
     try {
       notionResponse = await notion.pages.create({
         parent: { database_id: notionDbId },
-        properties: mappedProps,
+        properties,
         children: firstBlockChildren,
       } as any);
     } catch (e: any) {
@@ -633,40 +610,23 @@ app.post(['/api/save-to-notion', '/save-to-notion'], async (req, res) => {
         fallbackUsed = true;
         fallbackMessage = e.message;
 
-        console.warn('Initial pages.create failed, retrying with Title/Name fallback. Error:', e.message);
+        console.warn(
+          'First pages.create failed with properties, retrying with ONLY title. Error:',
+          e.message
+        );
 
-        // Try title-only creation with detected or fallback title keys
-        const titleKeysToTry = [titlePropKey, 'Title', 'Name', '이름', '제목'];
-        let created = false;
-
-        for (const tk of titleKeysToTry) {
-          try {
-            notionResponse = await notion.pages.create({
-              parent: { database_id: notionDbId },
-              properties: {
-                [tk]: {
-                  title: [{ type: 'text', text: { content: String(titleValue).substring(0, 2000) } }],
-                },
-              },
-              children: firstBlockChildren,
-            } as any);
-            created = true;
-            break;
-          } catch (retryErr) {
-            // continue next key
-          }
-        }
-
-        if (!created) {
-          throw e;
-        }
+        notionResponse = await notion.pages.create({
+          parent: { database_id: notionDbId },
+          properties: { Title: properties['Title'] },
+          children: firstBlockChildren,
+        } as any);
       } else {
         throw e;
       }
     }
 
     const pageId = notionResponse.id;
-    const successProperties = fallbackUsed ? [titlePropKey] : Object.keys(mappedProps);
+    const successProperties = fallbackUsed ? ['Title'] : Object.keys(properties);
 
     if (blocks.length > 95) {
       for (let i = 95; i < blocks.length; i += 80) {
@@ -682,7 +642,7 @@ app.post(['/api/save-to-notion', '/save-to-notion'], async (req, res) => {
       success: true,
       url: notionResponse.url,
       mappedProperties: successProperties,
-      debugMappedProperties: mappedProps,
+      debugMappedProperties: properties,
       debugFallbackUsed: fallbackUsed,
       blockCount: blocks.length,
       message: fallbackUsed
