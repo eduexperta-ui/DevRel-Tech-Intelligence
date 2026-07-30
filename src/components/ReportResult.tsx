@@ -42,7 +42,7 @@ export const ReportResult: React.FC<ReportResultProps> = ({
   const effectiveSources = sources ?? [];
 
   const originalSourceCount = effectiveSources.filter(
-    (source) => source.sourceType === "original" || source.sourceType === "direct" || !source.isGroundingRedirect
+    (source) => source.sourceType === "original"
   ).length;
 
   const redirectSourceCount = effectiveSources.filter(

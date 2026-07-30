@@ -307,35 +307,8 @@ app.post(['/api/analyze', '/analyze'], async (req, res) => {
       });
     }
 
-function normalizeSourceServer(title: string, uri: string) {
-  const isRedirect = uri.includes("vertexaisearch.cloud.google.com") || uri.includes("google.com/url");
-  return {
-    title: title.trim(),
-    uri: uri.trim(),
-    isGroundingRedirect: isRedirect,
-    sourceType: isRedirect ? "grounding_redirect" : "direct",
-    domain: (() => { try { return new URL(uri).hostname; } catch { return undefined; } })(),
-    statusLabel: isRedirect ? "GROUNDING REDIRECT" : "ORIGINAL URL",
-  };
-}
-
-    const groundingChunks =
-      response.candidates?.[0]?.groundingMetadata?.groundingChunks ?? [];
-
-    const extractedSources = groundingChunks
-      .map((chunk: any) => {
-        const title = chunk?.web?.title;
-        const uri = chunk?.web?.uri;
-        if (title && uri) {
-          return normalizeSourceServer(title, uri);
-        }
-        return null;
-      })
-      .filter((s: any) => s !== null);
-
     return res.json({
       text: response.text,
-      sources: extractedSources,
       ...response,
       usedModel,
     });

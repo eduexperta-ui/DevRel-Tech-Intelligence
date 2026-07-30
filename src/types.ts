@@ -23,33 +23,16 @@ export type EvidenceStatus =
   | "redirect_only"
   | "no_sources";
 
-export interface SourceItem {
+export interface Source {
   title: string;
-  uri: string;                 // grounding에서 받은 원본 (redirect일 수 있음)
-  originalUrl?: string;        // 추출한 실제 원문 URL
-  isGroundingRedirect: boolean;
-  sourceType: "direct" | "grounding_redirect" | "original" | "unknown";
-  domain?: string;
+  uri: string;
+
+  sourceType?: "original" | "grounding_redirect";
   statusLabel?: "ORIGINAL URL" | "GROUNDING REDIRECT";
+
+  domain?: string;
   publishedAt?: string | null;
 }
-
-export function normalizeSource(title: string, uri: string, originalUrl?: string): SourceItem {
-  const isRedirect = uri.includes("vertexaisearch.cloud.google.com")
-    || uri.includes("google.com/url");
-  const resolvedUrl = originalUrl || (isRedirect ? undefined : uri);
-  return {
-    title,
-    uri,
-    originalUrl: resolvedUrl,
-    isGroundingRedirect: isRedirect,
-    sourceType: isRedirect ? "grounding_redirect" : "direct",
-    domain: (() => { try { return new URL(resolvedUrl || uri).hostname; } catch { return undefined; } })(),
-    statusLabel: isRedirect ? "GROUNDING REDIRECT" : "ORIGINAL URL",
-  };
-}
-
-export type Source = SourceItem;
 
 export interface FactMetrics {
   totalSourcesCollected: number;
@@ -161,3 +144,6 @@ export interface NotionResponse {
   message?: string;
   error?: string;
 }
+
+// 하위 호환성을 위한 별칭
+export type SourceItem = Source;

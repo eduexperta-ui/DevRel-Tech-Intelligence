@@ -5,7 +5,7 @@ import { ArchitectureDiagram } from './components/ArchitectureDiagram';
 import { IntelligenceConfigPanel } from './components/IntelligenceConfigPanel';
 import { ReportResult } from './components/ReportResult';
 import { analyzeTrend } from './services/geminiService';
-import { Source, normalizeSource, NotionResponse, Period, AnalysisPurpose, FactMetrics } from './types';
+import { Source, NotionResponse, Period, AnalysisPurpose, FactMetrics } from './types';
 import { TemplateId, getTemplate, getTemplateKeywordsText } from './config/reportTemplates';
 
 const isGroundingRedirect = (uri: string) => {
@@ -252,7 +252,10 @@ console.log(
         const uri = chunk?.web?.uri;
 
         if (title && uri) {
-          extractedSources.push(normalizeSource(title, uri));
+          extractedSources.push({
+            title,
+            uri,
+          });
         }
       });
 
@@ -335,7 +338,7 @@ console.log(
       // Auto-save to Notion
       // 직접 원문 URL이 하나 이상 있을 때만 자동 저장
       const hasOriginalSource = normalizedSources.some(
-        (source) => source.sourceType === "original" || source.sourceType === "direct" || !source.isGroundingRedirect
+        (source) => source.sourceType === "original"
       );
 
       if (hasOriginalSource && !isSavingToNotion) {
