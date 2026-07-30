@@ -4,45 +4,31 @@ import {
   Database, Layers, FileText, Radar, Sparkles, SlidersHorizontal, 
   ChevronDown, ChevronUp, CheckCircle2, Globe, Cpu, Minus, Plus
 } from 'lucide-react';
-import { CATEGORIES, PERIODS, TARGET_AGES, PURPOSES, DATA_SOURCES } from '../constants';
+import { CATEGORIES, PERIODS, TARGET_AGES, PURPOSES, DATA_SOURCES, DEVREL_PRESETS, DevRelPreset } from '../constants';
 import { AnalysisPurpose, Period } from '../types';
-import { REPORT_TEMPLATES, TemplateId } from '../config/reportTemplates';
 
 interface IntelligenceConfigPanelProps {
-  templateId: TemplateId;
-  onTemplateChange: (templateId: TemplateId) => void;
-
   period: Period;
   setPeriod: (period: Period) => void;
-
   selectedCategories: string[];
   setSelectedCategories: (categories: string[]) => void;
-
   targetAges: string[];
   setTargetAges: (ages: string[]) => void;
-
   purpose: AnalysisPurpose;
   setPurpose: (purpose: AnalysisPurpose) => void;
-
   dataSources: string[];
   setDataSources: (sources: string[]) => void;
-
   keyword: string;
   setKeyword: (keyword: string) => void;
-
   articleCount: number;
   setArticleCount: (count: number) => void;
-
   image: string | null;
   setImage: (image: string | null) => void;
-
   isAnalyzing: boolean;
   onAnalyze: () => void;
 }
 
 export const IntelligenceConfigPanel: React.FC<IntelligenceConfigPanelProps> = ({
-  templateId,
-  onTemplateChange,
   period,
   setPeriod,
   selectedCategories,
@@ -63,7 +49,10 @@ export const IntelligenceConfigPanel: React.FC<IntelligenceConfigPanelProps> = (
   onAnalyze,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [activePresetId, setActivePresetId] = useState<string>('k-tech-leaders');
   const [showExpertMode, setShowExpertMode] = useState<boolean>(false);
+
+  const activePreset = DEVREL_PRESETS.find(p => p.id === activePresetId) || DEVREL_PRESETS[0];
 
   // Helper to parse '최근 X일' or '최근 X개월' into days (1~90)
   const getDaysFromPeriod = (p: string): number => {
@@ -71,23 +60,29 @@ export const IntelligenceConfigPanel: React.FC<IntelligenceConfigPanelProps> = (
     if (matchDays) return parseInt(matchDays[1], 10);
     const matchMonths = p.match(/(\d+)\s*개월/);
     if (matchMonths) return parseInt(matchMonths[1], 10) * 30;
-    if (p.includes('7') || p.includes('1주')) return 7;
-    if (p.includes('14') || p.includes('2주')) return 14;
-    if (p.includes('30') || p.includes('1개월')) return 30;
-    if (p.includes('60') || p.includes('2개월')) return 60;
-    if (p.includes('90') || p.includes('3개월')) return 90;
+    if (p.includes('1주')) return 7;
+    if (p.includes('2주')) return 14;
     return 30;
   };
 
-  const getPeriodStringFromDays = (days: number): Period => {
-    if (days <= 7) return "recent7";
-    if (days <= 14) return "recent14";
-    if (days <= 30) return "recent30";
-    if (days <= 60) return "recent60";
-    return "recent90";
+  const getPeriodStringFromDays = (days: number): string => {
+    return `최근 ${days}일`;
+  };
+
+  const applyPreset = (preset: DevRelPreset) => {
+    setActivePresetId(preset.id);
+    setPeriod(preset.period as Period);
+    setSelectedCategories(preset.selectedCategories);
+    setTargetAges(preset.targetAges);
+    setPurpose(preset.purpose as AnalysisPurpose);
+    setDataSources(preset.dataSources);
+    setKeyword(''); // Clear typed keyword so preset's example keyword does NOT force auto-filtering
+    setArticleCount(preset.articleCount);
   };
 
   const toggleItem = (list: string[], item: string, setter: (newList: string[]) => void) => {
+    // Modify fine-tuning will set preset to custom
+    setActivePresetId('custom');
     if (list.includes(item)) {
       setter(list.filter((i) => i !== item));
     } else {
@@ -108,7 +103,8 @@ export const IntelligenceConfigPanel: React.FC<IntelligenceConfigPanelProps> = (
 
   return (
     <div className="max-w-4xl mx-auto mb-12 space-y-4">
-      {/* Horizontal Bookmark / Tab Navigation Header */}
+      
+      {/* Horizontal Bookmark / Tab Navigation Header (Equal 50:50 Width) */}
       <div className="grid grid-cols-2 gap-2 max-w-4xl mx-auto">
         <button
           type="button"
@@ -142,7 +138,7 @@ export const IntelligenceConfigPanel: React.FC<IntelligenceConfigPanelProps> = (
         </button>
       </div>
 
-      {/* Configuration Panel Container */}
+      {/* 1. DevRel Quick Start Presets & Configuration Panel Container */}
       <div className="bg-white p-6 sm:p-8 rounded-b-3xl rounded-t-xl border border-neutral-200/90 shadow-xs relative z-0">
         <div className="mb-5 pb-4 border-b border-neutral-100">
           <div className="flex items-center gap-2">
@@ -156,103 +152,78 @@ export const IntelligenceConfigPanel: React.FC<IntelligenceConfigPanelProps> = (
           <p className="text-xs text-neutral-500 mt-1">
             {showExpertMode
               ? '수집 기간, 카테고리, 오디언스, 데이터 소스 등 세부 조건과 키워드를 자유롭게 지정하세요.'
-              : '템플릿은 기간·검색 대상·분석 질문·리포트 구조를 함께 적용합니다.'}
+              : 'DevRel 목표(기술 블로그, 커뮤니티 트렌드, 채용 브랜딩, 테크 세션)에 맞는 추천 템플릿을 선택하세요.'}
           </p>
         </div>
 
-        {/* Preset Cards Grid (Only shown in Recommended Templates Mode) */}
+        {/* Preset Cards Grid (Only shown in Scenario Mode) */}
         {!showExpertMode ? (
-          <section className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {Object.values(REPORT_TEMPLATES).map((template) => {
-                const isSelected = template.id === templateId;
-
-                return (
-                  <button
-                    key={template.id}
-                    type="button"
-                    onClick={() => onTemplateChange(template.id)}
-                    disabled={isAnalyzing}
-                    className={[
-                      "rounded-2xl border p-5 text-left transition-colors cursor-pointer",
-                      "disabled:cursor-not-allowed disabled:opacity-60",
-                      isSelected
-                        ? "border-neutral-900 bg-neutral-900 text-white shadow-md"
-                        : "border-neutral-200 bg-white text-neutral-900 hover:border-neutral-500",
-                    ].join(" ")}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <span
-                        className={[
-                          "text-xs font-bold",
-                          isSelected ? "text-emerald-300" : "text-neutral-500",
-                        ].join(" ")}
-                      >
-                        {template.group}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {DEVREL_PRESETS.map((preset) => {
+              const isSelected = activePresetId === preset.id;
+              return (
+                <div
+                  key={preset.id}
+                  onClick={() => applyPreset(preset)}
+                  className={`p-4 rounded-xl border transition-all duration-150 cursor-pointer flex flex-col justify-between ${
+                    isSelected
+                      ? 'bg-neutral-900 border-neutral-900 text-white shadow-md'
+                      : 'bg-neutral-50/50 border-neutral-200 hover:bg-white hover:border-neutral-300 text-neutral-800'
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                        isSelected ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-neutral-200/80 text-neutral-700'
+                      }`}>
+                        {preset.badge}
                       </span>
-
                       {isSelected && (
-                        <span className="rounded-full bg-white/15 px-2.5 py-1 text-xs font-bold text-emerald-400 flex items-center gap-1">
+                        <span className="text-emerald-400 flex items-center gap-1 text-[11px] font-bold">
                           <CheckCircle2 className="w-3.5 h-3.5" /> 선택됨
                         </span>
                       )}
                     </div>
-
-                    <h3 className="mt-3 text-base font-black tracking-tight">
-                      {template.title}
+                    <h3 className={`text-sm font-bold ${isSelected ? 'text-white' : 'text-neutral-900'}`}>
+                      {preset.title}
                     </h3>
-
-                    <p
-                      className={[
-                        "mt-2 text-sm leading-6",
-                        isSelected ? "text-neutral-300" : "text-neutral-600",
-                      ].join(" ")}
-                    >
-                      {template.description}
+                    <p className={`text-xs mt-1 leading-relaxed line-clamp-2 ${isSelected ? 'text-neutral-300' : 'text-neutral-600'}`}>
+                      {preset.description}
                     </p>
+                  </div>
 
-                    <div
-                      className={[
-                        "mt-4 border-t pt-4 flex items-center justify-between text-xs",
-                        isSelected ? "border-white/15" : "border-neutral-100",
-                      ].join(" ")}
-                    >
-                      <div className="flex items-center gap-2 truncate max-w-[70%]">
-                        <span
-                          className={[
-                            "font-bold shrink-0",
-                            isSelected ? "text-neutral-300" : "text-neutral-500",
-                          ].join(" ")}
-                        >
-                          추천 키워드
-                        </span>
-
-                        <span className="font-semibold truncate">
-                          {template.defaultKeywords.join(", ")}
-                        </span>
-                      </div>
-
-                      <span
-                        className={[
-                          "font-bold shrink-0",
-                          isSelected ? "text-emerald-300" : "text-neutral-500",
-                        ].join(" ")}
-                      >
-                        {template.defaultPeriod.replace("recent", "최근 ")}일
+                  <div className={`mt-3 pt-2.5 border-t text-[11px] flex items-center justify-between ${
+                    isSelected ? 'border-neutral-800' : 'border-neutral-200'
+                  }`}>
+                    <div className="flex items-center gap-1.5 truncate max-w-[75%]">
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ${
+                        isSelected ? 'bg-neutral-800 text-neutral-300' : 'bg-neutral-200/80 text-neutral-700'
+                      }`}>
+                        추천 키워드
+                      </span>
+                      <span className={`truncate text-[11px] font-medium ${
+                        isSelected ? 'text-neutral-300' : 'text-neutral-600'
+                      }`}>
+                        {preset.keyword}
                       </span>
                     </div>
-                  </button>
-                );
-              })}
-            </div>
-          </section>
+                    <span className={`shrink-0 font-medium text-[11px] ${
+                      isSelected ? 'text-neutral-400' : 'text-neutral-500'
+                    }`}>
+                      {preset.period}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         ) : (
-          /* Detailed Filter Grid */
+          /* Detailed Filter Grid (Shown in Detailed Filter Mode) */
           <div className="space-y-5">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-neutral-50/80 p-5 md:p-6 rounded-2xl border border-neutral-200/90">
               {/* Column 1: Period & Target Audience */}
               <div className="space-y-5">
-                {/* Period Drag Slider */}
+                {/* Period Drag Slider (1-day steps) */}
                 <section className="space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
@@ -272,6 +243,7 @@ export const IntelligenceConfigPanel: React.FC<IntelligenceConfigPanelProps> = (
                           const days = getDaysFromPeriod(period);
                           if (days > 1) {
                             setPeriod(getPeriodStringFromDays(days - 1));
+                            setActivePresetId('custom');
                           }
                         }}
                         disabled={getDaysFromPeriod(period) <= 1}
@@ -290,6 +262,7 @@ export const IntelligenceConfigPanel: React.FC<IntelligenceConfigPanelProps> = (
                         onChange={(e) => {
                           const days = parseInt(e.target.value, 10);
                           setPeriod(getPeriodStringFromDays(days));
+                          setActivePresetId('custom');
                         }}
                         className="w-full h-2 bg-neutral-200 rounded-lg appearance-none cursor-pointer accent-neutral-900 focus:outline-none"
                       />
@@ -300,6 +273,7 @@ export const IntelligenceConfigPanel: React.FC<IntelligenceConfigPanelProps> = (
                           const days = getDaysFromPeriod(period);
                           if (days < 90) {
                             setPeriod(getPeriodStringFromDays(days + 1));
+                            setActivePresetId('custom');
                           }
                         }}
                         disabled={getDaysFromPeriod(period) >= 90}
@@ -329,7 +303,6 @@ export const IntelligenceConfigPanel: React.FC<IntelligenceConfigPanelProps> = (
                     {TARGET_AGES.map((age) => (
                       <button
                         key={age}
-                        type="button"
                         onClick={() => toggleItem(targetAges, age, setTargetAges)}
                         className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold border transition-all ${
                           targetAges.includes(age)
@@ -357,6 +330,7 @@ export const IntelligenceConfigPanel: React.FC<IntelligenceConfigPanelProps> = (
                       value={purpose}
                       onChange={(e) => {
                         setPurpose(e.target.value as AnalysisPurpose);
+                        setActivePresetId('custom');
                       }}
                       className="w-full p-2.5 bg-white border border-neutral-200 rounded-xl text-xs font-bold focus:border-neutral-900 outline-none transition-all appearance-none cursor-pointer text-neutral-900 pr-10 shadow-2xs"
                     >
@@ -380,7 +354,6 @@ export const IntelligenceConfigPanel: React.FC<IntelligenceConfigPanelProps> = (
                     {CATEGORIES.map((cat) => (
                       <button
                         key={cat.id}
-                        type="button"
                         onClick={() => toggleItem(selectedCategories, cat.label, setSelectedCategories)}
                         className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold border transition-all ${
                           selectedCategories.includes(cat.label)
@@ -434,7 +407,7 @@ export const IntelligenceConfigPanel: React.FC<IntelligenceConfigPanelProps> = (
           </div>
         )}
 
-        {/* Search Input & Action Button Bar */}
+        {/* Search Input & Action Button Bar (Located at the bottom of both modes) */}
         <div className="mt-5 pt-4 border-t border-neutral-100">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
             <label className="text-[11px] font-extrabold text-neutral-800 uppercase tracking-wider flex items-center gap-1.5">
@@ -448,7 +421,10 @@ export const IntelligenceConfigPanel: React.FC<IntelligenceConfigPanelProps> = (
               <input
                 type="text"
                 value={keyword}
-                onChange={(e) => setKeyword(e.target.value)}
+                onChange={(e) => {
+                  setKeyword(e.target.value);
+                  setActivePresetId('custom');
+                }}
                 onKeyDown={(e) => e.key === 'Enter' && onAnalyze()}
                 placeholder="[선택] 직접 입력 시에만 탐색 키워드로 제한됩니다 (예: LLM, MSA, Kafka)"
                 className="w-full pl-11 pr-20 py-3 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-medium focus:outline-none focus:bg-white focus:border-neutral-900 transition-all placeholder:text-neutral-400"
@@ -467,7 +443,6 @@ export const IntelligenceConfigPanel: React.FC<IntelligenceConfigPanelProps> = (
                 )}
                 <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleImageUpload} />
                 <button
-                  type="button"
                   onClick={() => fileInputRef.current?.click()}
                   className="p-1.5 text-neutral-400 hover:text-neutral-900 transition-colors bg-white rounded-lg border border-neutral-200"
                   title="참고 이미지 첨부"
@@ -478,7 +453,6 @@ export const IntelligenceConfigPanel: React.FC<IntelligenceConfigPanelProps> = (
             </div>
 
             <button
-              type="button"
               onClick={onAnalyze}
               disabled={isAnalyzing}
               className="px-6 py-3 bg-neutral-900 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-sm hover:bg-neutral-800 active:scale-95 disabled:opacity-50 shrink-0"
@@ -511,3 +485,4 @@ export const IntelligenceConfigPanel: React.FC<IntelligenceConfigPanelProps> = (
     </div>
   );
 };
+

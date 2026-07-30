@@ -1,207 +1,132 @@
-import {
-  getTemplate,
-  type TemplateId,
-} from "../config/reportTemplates";
-
-const toKoreanPeriodLabel = (period: string) => {
-  const map: Record<string, string> = {
-    recent7: "최근 1주",
-    recent14: "최근 2주",
-    recent30: "최근 1개월",
-    recent60: "최근 2개월",
-    recent90: "최근 3개월",
-  };
-
-  return map[period] ?? period;
-};
-
 export const getTrendAnalysisPrompt = (
-  period: string,
-  selectedCategories: string[],
+  period: string, 
+  selectedCategories: string[], 
   targetAges: string[],
   purpose: string,
   dataSources: string[],
-  keyword: string,
-  articleCount: number,
-  templateId: TemplateId = "korean-engineering"
+  keyword: string, 
+  articleCount: number
 ) => {
-  const template = getTemplate(templateId);
-  const currentDate = new Date().toISOString().slice(0, 10);
-  const periodLabel = toKoreanPeriodLabel(period);
-
-  const keywordList = keyword
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
+  const userTypedKeyword = keyword && keyword.trim().length > 0 ? keyword.trim() : null;
+  const currentDateStr = new Date().toISOString().slice(0, 10);
 
   return `
-당신은 Engineering Organization DevRel Tech Intelligence 분석 에이전트입니다.
+너는 테크 기업 및 개발조직(Engineering Org)을 위한
+**'DevRel Tech Intelligence & Content Briefing Agent'**다.
 
-오늘 날짜는 ${currentDate}입니다.
-반드시 Google Search Grounding 결과 및 반환된 source metadata에 근거하여 분석하세요.
+목표:
+개발조직 내외부의 주요 기술 트렌드, 테크 블로그 글, 컨퍼런스 발표안, 사내 기술 회고 데이터를 수집·분석하여
+DevRel 담당자, 테크 리더, 개발자 교육 기획자가 즉시 실행할 수 있는 **'기술 정보 브리프 및 DevRel 액션 리포트'**를 생성하라.
 
-# 선택된 리포트 템플릿
+[Google Search 실시간 그라운딩 & 수집 기간 제약 지침]
+- 현재 분석 실행 시점(오늘 기준일): ${currentDateStr}
+- 분석 요청 대상 기간: ${period}
+- Google Search 도구를 반드시 가동하여 선택된 소스(${dataSources.join(', ')})에서 **실제로 존재하고 오늘 기준 ${period} 이내에 최근 작성/발행된 최신 테크 포스트 및 아티클**을 직접 실시간 검색 및 파싱하라.
+- 구글 검색 결과에서 추출된 실시간 원본 기사 및 URL 정보를 바탕으로 본문에 인용표기 [1], [2]를 남기고, 출처 링크가 정확하게 매핑되도록 하라.
 
-- 템플릿 ID: ${template.id}
-- 템플릿명: ${template.title}
-- 템플릿 목표: ${template.description}
-- 분석 기간: ${periodLabel}
-- 선택 카테고리: ${selectedCategories.join(", ") || "미지정"}
-- 분석 목적: ${purpose}
-- 설정된 데이터 소스: ${dataSources.join(", ") || "미지정"}
-- 사용자 키워드: ${keywordList.join(", ") || "미지정"}
-- 목표 수집량: 최대 ${articleCount}개
-- 타깃 대상: ${targetAges.join(", ") || "일반 개발자/기술 조직"}
+[핵심 분석 원칙]
+1. **Signal over Noise**: 단순 기술 키워드 나열이 아닌, 실제 개발 조직의 생산성과 기술 커뮤니케이션, 채용 브랜딩에 미치는 핵심 시그널을 포착하라.
+2. **Technical Depth & Structure**: 기술 아키텍처, 프레임워크/라이브러리, 개발 생산성 툴, 엔지니어링 문화 단위로 구조화하여 분석하라.
+3. **Strategic Insight**: "무엇이 유행이다"가 아니라 "왜 이 기술 사례가 주목받으며, 우리 오디언스(${targetAges.join(', ')})에게 어떤 학습 및 채용 브랜딩 의미가 있는가"를 도출하라.
+4. **Action-Oriented**: 분석의 끝은 항상 DevRel 팀이 실행할 수 있는 구체적인 액션 아이디어(테크블로그 아티클 기획, 사내 세션/교육 주제, 채용 브랜딩 카피, FAQ 아카이빙)여야 한다. 특히 이번 분석의 목적은 **'${purpose}'**임을 명심하라.
+5. **Data Structured**: 리포트 본문 외에, 기술 시그널 데이터 테이블과 액션 아이디어를 JSON으로 구조화하여 출력하라.
 
-# 템플릿별 수집 지침
+[데이터 소스 우선순위]
+선택된 소스: ${dataSources.join(', ')}
+- 1순위: 국내 주요 테크 기업 블로그 (네이버, 카카오, 라인, 쿠팡, 배달의민족, 당근, 토스 등)의 아키텍처 및 재구축 사례
+- 2순위: 글로벌 빅테크 엔지니어링 블로그 (Google Engineering, Netflix TechBlog, Uber Engineering, AWS Architecture 등)
+- 3순위: 국내외 대표 개발자 커뮤니티 및 아그리게이터 (Hacker News, GeekNews, Velog, Reddit r/programming, GitHub Trending)
+- 4순위: 주요 개발자 컨퍼런스 (DEVIEW, FEConf, AWS re:Invent, Spring Camp 등) 발표안 및 최신 릴리스 노트
 
-${template.searchGuidance.map((item, index) => `${index + 1}. ${item}`).join("\n")}
+[분석 요청 사항]
+오늘 기준일: ${currentDateStr}
+수집 대상 기간: ${period} (실제 최근 ${period} 이내에 발행된 기술 포스트 및 공식 블로그 수집)
+관심 기술 카테고리: ${selectedCategories.join(', ')}
+타겟 오디언스: ${targetAges.join(', ')}
+분석 목적: ${purpose}
+사용자 입력 추가 키워드: ${userTypedKeyword ? `"${userTypedKeyword}" (사용자가 입력한 특정 검색 단어)` : '없음 (추가 입력 단어 없음)'}
+데이터 수집 및 요약 깊이: 선택된 기간(${period}) 내 검색 결과 중 신뢰도 높은 최신 테크 원문 10~20건 자동 탐색 및 깊이 있는 교차 검증
 
-# 반드시 답해야 할 분석 질문
+${userTypedKeyword 
+  ? `[키워드 가중치 지침] 사용자가 직접 지정한 키워드 "${userTypedKeyword}"에 대한 최신 사례 및 연관 기술 동향을 최우선적으로 탐색하여 분석 리포트에 비중 있게 반영하라.`
+  : `[키워드 가중치 지침] 사용자가 추가 키워드를 입력하지 않았으므로(선택사항), 특정 주제로 편향되지 않게 선택된 카테고리 [${selectedCategories.join(', ')}] 전반의 대표 기술 트렌드를 고르게 수집하라.`
+}
 
-${template.analysisQuestions.map((item, index) => `${index + 1}. ${item}`).join("\n")}
+[출력 구조]
+> **분석 기간:** ${period}
+> **기술 카테고리:** ${selectedCategories.join(', ')}
+> **타겟 오디언스:** ${targetAges.join(', ')}
+> **분석 목적:** ${purpose}
+${userTypedKeyword ? `> **특동 탐색 키워드:** ${userTypedKeyword}\n` : ''}
 
-# 출처 및 사실성 규칙
+## 1. Executive Summary (주요 기술 동향 요약)
+- 이번 주 개발 생태계 및 조직을 관통하는 핵심 기술 이슈 3줄 요약.
+- 타겟 오디언스(${targetAges.join(', ')})의 기술 학습 관심사 및 니즈 변화.
 
-1. 실제로 반환된 grounding source metadata 또는 본문 인용에 근거가 있는 내용만 작성하세요.
-2. 직접 원문 URL이 제공되지 않았다면 URL을 추측하거나 만들어 내지 마세요.
-3. Grounding redirect URL만 확인되는 경우, "원문 URL 직접 검증 불가"라고 명시하세요.
-4. 기사 발행일, 기업명, 성능 수치, 도입 결과는 근거가 확인될 때만 작성하세요.
-5. 출처 수가 적거나 redirect-only인 경우, 강한 일반화·시장 규모 추정·성과 단정은 하지 마세요.
-6. 커뮤니티 글과 공식 기술 블로그는 같은 수준의 증거로 취급하지 마세요.
-7. "검증 완료", "사실 확인 완료", "정확도 90%" 같은 표현은 사용하지 마세요.
-8. 0~100 점수, 신뢰도 점수, 임의 우선순위 수치, 임의 매트릭스 좌표를 생성하지 마세요.
-9. 근거가 부족하면 "확인 불가", "추가 원문 확인 필요", "정성적 관찰"로 표현하세요.
+## 2. Tech Signal Deep-Dive (핵심 기술 사례 및 시그널)
+- 포착된 핵심 기술 트렌드 3가지에 대해 상세 분석.
+- 각 트렌드별: 대표 기술명/사례, 도입 배경, 핵심 라이브러리/아키텍처, 조직적 시사점.
+- 문장 끝에 [1], [2] 형태의 숫자 참조를 반드시 포함하라.
 
-# Markdown 보고서 형식
-
-아래 제목과 순서를 지키세요.
-
-# ${template.title}
-
-> 분석 기간: ${periodLabel}
-> 기준일: ${currentDate}
-> 템플릿: ${template.title}
-> 출처 상태: 수집된 grounding metadata 기준으로만 표기
-
-## 1. 핵심 요약
-
-- 확인된 시그널 3~5개
-- 이번 템플릿 목적에 중요한 이유
-- 직접 원문 URL이 없을 경우 그 한계 명시
-
-## 2. 수집 범위와 증거 한계
-
-- 사용한 검색/수집 범위
-- 공식 출처와 커뮤니티 출처의 구분
-- 직접 원문 URL 확인 여부
-- 분석에서 확인할 수 없었던 정보
-
-## 3. 템플릿별 핵심 분석
-
-아래 템플릿 목적에 맞춰 작성하세요.
-
-- 국내 IT 템플릿: 기업별 최신 포스트, 기술 주제, 실무 맥락, 콘텐츠 활용 포인트
-- AI/ML 템플릿: 문제, 아키텍처/패턴, 평가·운영 고려사항, 실험 체크리스트
-- 조직 문화 템플릿: DevEx 관행, 조직 운영 신호, 채용 브랜딩 전환 포인트
-- 글로벌 템플릿: 공식 기술 사례, 커뮤니티 논의, 국내 DevRel 재해석 포인트
-
-## 4. DevRel 콘텐츠 기회
-
-각 항목에 대해 다음을 작성하세요.
-
-- 제안 주제
-- 권장 포맷: 기술 블로그 / 테크 세션 / 사례 연구 / 커뮤니티 포스트 중 하나
-- 누구에게 유용한가
-- 근거가 된 source metadata 번호 또는 "추가 원문 확인 필요"
-- 과장 없이 말할 수 있는 핵심 메시지
-
-## 5. 다음 액션
-
-P1, P2, P3로 구분하되, 숫자 점수는 쓰지 마세요.
-
-- P1: 원문 확인 또는 즉시 기획할 작업
-- P2: 추가 조사 후 기획할 작업
-- P3: 모니터링할 작업
-
-## 6. 한계 및 후속 검증
-
-- 원문 URL 직접 확인이 필요한 항목
-- 발행일·기술 수치·사례 결과가 불명확한 항목
-- 추가 조사 질문
+## 3. DevRel Actionable Ideas (운영 제안)
+- 분석 목적(${purpose})에 부합하는 구체적인 테크블로그 아티클/교육 세션/채용 브랜딩 아이디어 3가지.
 
 ---
 
-# JSON 메타데이터
+[JSON 출력 규칙]
+리포트 본문 뒤에 반드시 아래 형식의 JSON을 \`\`\`json 코드 블록으로 포함하라.
 
-Markdown 보고서가 끝난 뒤, 반드시 아래 JSON만 코드 블록으로 출력하세요.
-JSON 밖에 추가 설명을 붙이지 마세요.
-
-\`\`\`json
 {
-  "dashboardData": {
-    "reportMeta": {
-      "templateId": "${template.id}",
-      "templateTitle": "${template.title}",
-      "evidenceStatus": "has_original_sources | redirect_only | no_sources",
-      "originalSourceCount": 0,
-      "groundingRedirectCount": 0,
-      "uniqueDomainCount": 0,
-      "limitations": [
-        "직접 원문 URL 확인 여부를 포함한 한계"
-      ]
-    },
+  "dashboard_data": {
     "topTrends": [
       {
-        "title": "핵심 시그널 제목",
-        "summary": "근거 기반 요약",
-        "keyItems": ["키워드 1", "키워드 2"],
-        "signalLevel": "high | medium | low",
-        "rationale": "이 시그널을 중요하게 본 근거와 한계"
+        "title": "기술 시그널/사례명",
+        "summary": "핵심 기술 요약",
+        "keyItems": ["핵심기술1", "라이브러리2"],
+        "keyColors": ["아키텍처/태그1"],
+        "score": 88
       }
     ],
-    "contentOpportunities": [
-      {
-        "title": "콘텐츠 제안 제목",
-        "target": "대상 독자",
-        "description": "제안 내용",
-        "format": "blog | tech-talk | case-study | community-post",
-        "rationale": "출처와 목적에 근거한 이유"
-      }
+    "categoryPriorities": [
+      { "category": "카테고리명", "score": 92, "priority": 1 }
     ],
-    "companyPosts": [],
-    "implementationPatterns": [],
-    "devexSignals": [],
-    "globalSignals": [],
-    "actionPlan": [
+    "ageInsights": [
+      { "ageGroup": "주니어 개발자", "insight": "기술 학습 및 문서화 인사이트" }
+    ],
+    "promotionIdeas": [
+      { "title": "콘텐츠/세션 제목", "description": "상세 기획 내용", "target": "타겟 오디언스", "priority": "P1" }
+    ],
+    "thumbnailCopies": ["헤드라인 카피1", "아티클 제목2", "세션 타이틀3"],
+    "sourcingPoints": ["지식 자산화 포인트1", "문서화/FAQ 포인트2", "교육 재활용 포인트3"],
+    "marketSignals": [
       {
-        "priority": "P1 | P2 | P3",
-        "action": "수행할 작업",
-        "owner": "DevRel | Engineering | Recruiting | Content",
-        "expectedOutput": "산출물"
+        "signal": "기술 시그널명",
+        "source": "출처/블로그명",
+        "impact": "High|Medium|Low",
+        "categories": ["Backend"],
+        "targetAges": ["시니어 개발자"]
       }
     ]
   },
-  "notionPayload": {
-    "databaseProperties": {
-      "Title": "${template.title} - ${periodLabel}",
-      "Period": "${periodLabel}",
-      "Template": "${template.title}",
-      "Categories": "${selectedCategories.join(", ")}",
-      "Keywords": "${keywordList.join(", ")}",
-      "Purpose": "${purpose}"
-    }
+  "notion_payload": {
+    "database_properties": {
+      "Title": "[${period}] ${selectedCategories.join('·')} DevRel 브리프 - ${purpose} (${targetAges.join(', ')})",
+      "Period": "${period}",
+      "Impact": "High",
+      "Keywords": "${userTypedKeyword || '기본 전체 수집'}",
+      "Categories": "${selectedCategories.join(', ')}",
+      "Purpose": "${purpose}",
+      "TargetAges": "${targetAges.join(', ')}"
+    },
+    "markdown_body": "> **분석 기간:** ${period}\\n> **기술 카테고리:** ${selectedCategories.join(', ')}\\n> **타겟 오디언스:** ${targetAges.join(', ')}\\n> **분석 목적:** ${purpose}\\n\\n## 1. Executive Summary (주요 기술 동향 요약)\\n(내용...)\\n\\n## 2. Tech Signal Deep-Dive (핵심 기술 사례 및 시그널)\\n(내용...)\\n\\n## 3. DevRel Actionable Ideas (운영 제안)\\n(내용...)"
   }
 }
-\`\`\`
 
-# JSON 작성 규칙
-
-- 템플릿에 맞는 배열만 채우세요.
-- 예: 국내 IT는 companyPosts, AI/ML은 implementationPatterns,
-  조직 문화는 devexSignals, 글로벌은 globalSignals를 우선 채우세요.
-- sourceIndex는 실제 grounding source metadata의 순번을 알고 있을 때만 사용하세요.
-- 근거를 알 수 없으면 sourceIndex에 null을 넣으세요.
-- score, confidence, mentionScore, utilityScore, matrixPosition 같은 필드는 절대 넣지 마세요.
+[최종 점검]
+- 단순 요약이 아닌 'DevRel Tech Intelligence' 관점인가?
+- 개발팀 및 DevRel 실무자가 즉시 테크블로그/세션 기획에 활용할 만큼 구체적인가?
+- 참조 기호 [1], [2]를 정확히 사용했는가?
+- JSON 형식이 완벽한가? (특히 categories와 targetAges는 배열이어야 함)
+- **중요**: notion_payload의 markdown_body는 리포트 본문 전체를 포함해야 하며, 노션 블록으로 변환하기 좋게 깔끔한 마크다운 형식을 유지하라.
 `;
 };

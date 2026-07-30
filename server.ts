@@ -188,7 +188,6 @@ app.post(['/api/analyze', '/analyze'], async (req, res) => {
       keyword,
       articleCount,
       imageBase64,
-      templateId,
     } = req.body;
 
     const apiKey = cleanEnv(process.env.Gemini_API_Key);
@@ -208,8 +207,7 @@ app.post(['/api/analyze', '/analyze'], async (req, res) => {
       purpose,
       dataSources,
       keyword,
-      articleCount,
-      templateId
+      articleCount
     );
 
     const parts: any[] = [{ text: textPrompt }];

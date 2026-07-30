@@ -1,126 +1,109 @@
-import type { TemplateId } from "./config/reportTemplates";
-
 export interface Category {
   id: string;
   label: string;
 }
 
-export type Period =
-  | "recent7"
-  | "recent14"
-  | "recent30"
-  | "recent60"
-  | "recent90";
+export type Period = string;
 
-export type AnalysisPurpose =
-  | "tech-blog"
-  | "community-trend"
-  | "employer-brand"
-  | "tech-session";
-
-export type EvidenceStatus =
-  | "has_original_sources"
-  | "redirect_only"
-  | "no_sources";
-
-export interface Source {
-  title: string;
-  uri: string;
-
-  sourceType?: "original" | "grounding_redirect";
-  statusLabel?: "ORIGINAL URL" | "GROUNDING REDIRECT";
-
-  domain?: string;
-  publishedAt?: string | null;
-}
+export type AnalysisPurpose = 
+  | '테크블로그 주제 선정'
+  | '사내 개발자 교육/세션 기획'
+  | '채용 브랜딩 콘텐츠 발굴'
+  | '기술 문서/FAQ 아카이빙'
+  | '기획전 테마 선정'
+  | '카테고리 운영 전략';
 
 export interface FactMetrics {
   totalSourcesCollected: number;
-  originalSourceCount: number;
-  groundingRedirectCount: number;
-  uniqueDomainCount: number;
-
   searchQueriesExecuted: string[];
-  evidenceStatus: EvidenceStatus;
-
-  responseChars?: number;
-  responseTokens?: number | null;
+  factCheckConfidenceScore: number;
+  crossValidationSourcesCount: number;
+  dataVolumeEstKb: number;
 }
 
-export interface ReportMeta {
-  templateId: TemplateId;
-  templateTitle: string;
+/**
+ * 외부/내부 기술 데이터 소스 개별 항목
+ */
+export interface SourceItem {
+  title: string;
+  uri: string;
+  type?: 'TechBlog' | 'Conference' | 'Wiki' | 'Community' | 'News';
+  snippet?: string;
 
-  evidenceStatus: EvidenceStatus;
-  originalSourceCount: number;
-  groundingRedirectCount: number;
-  uniqueDomainCount: number;
+  // 실제 원문 URL인지, Google Grounding redirect인지 구분
+  sourceType?: "original" | "grounding_redirect";
 
-  limitations: string[];
+  // UI에 보여줄 상태 라벨
+  statusLabel?: "원문 링크" | "Grounding redirect";
 }
 
-export interface QualitativeTrend {
+/**
+ * 포착된 개별 기술 시그널
+ */
+export interface TrendSignal {
+  signal: string;
+  source: string;
+  impact: 'High' | 'Medium' | 'Low';
+  categories: string[]; // 연결된 기술 카테고리
+  targetAges: string[]; // 대상 연령대/개발 직급
+  description?: string;
+}
+
+/**
+ * 클러스터링된 주요 기술 트렌드
+ */
+export interface TrendCluster {
+  id: string;
   title: string;
   summary: string;
-  keyItems: string[];
-
-  // 0–100 score 대신 정성 레벨만 사용한다.
-  signalLevel: "high" | "medium" | "low";
-  rationale: string;
+  signals: TrendSignal[];
+  keyItems: string[]; // 주요 기술 키워드/라이브러리/아키텍처
+  keyColors: string[]; // 관련 패키지/툴/태그
+  score?: number;
 }
 
-export interface ContentOpportunity {
+/**
+ * DevRel을 위한 구체적 실행 아이템
+ */
+export interface MDActionItem {
   title: string;
-  target: string;
   description: string;
-  format: "blog" | "tech-talk" | "case-study" | "community-post";
-  rationale: string;
+  target: string;
+  priority: 'P1' | 'P2' | 'P3';
+  type?: 'Blog' | 'Training' | 'Branding' | 'Documentation' | 'Strategy';
 }
 
+/**
+ * DevRel 액션 보드 데이터 구조
+ */
 export interface DashboardData {
-  reportMeta: ReportMeta;
+  topTrends: TrendCluster[];
+  categoryPriorities: { category: string; score: number; priority: number }[];
+  ageInsights: { ageGroup: string; insight: string }[];
+  promotionIdeas: MDActionItem[];
+  thumbnailCopies: string[];
+  sourcingPoints: string[];
+  marketSignals: TrendSignal[];
+}
 
-  topTrends: QualitativeTrend[];
-  contentOpportunities: ContentOpportunity[];
+/**
+ * 리포트 전체 요약 정보
+ */
+export interface ReportSummary {
+  mainTheme: string;
+  consumerSentiment: string;
+  opportunitySignals: string[];
+  riskSignals: string[];
+}
 
-  // templateId에 따라 하나만 채울 수 있다.
-  companyPosts?: Array<{
-    company: string;
-    title: string;
-    topic: string;
-    publishedAt: string | null;
-    sourceIndex: number | null;
-    whyItMatters: string;
-  }>;
-
-  implementationPatterns?: Array<{
-    pattern: string;
-    problem: string;
-    approach: string;
-    operationsNote: string;
-    sourceIndex: number | null;
-  }>;
-
-  devexSignals?: Array<{
-    theme: string;
-    observedPractice: string;
-    employerBrandAngle: string;
-    sourceIndex: number | null;
-  }>;
-
-  globalSignals?: Array<{
-    signal: string;
-    sourceKind: "official" | "community";
-    interpretation: string;
-    sourceIndex: number | null;
-  }>;
-
-  actionPlan: Array<{
-    priority: "P1" | "P2" | "P3";
-    action: string;
-    owner: string;
-    expectedOutput: string;
-  }>;
+/**
+ * 아키텍처 다이어그램용 블록
+ */
+export interface ArchitectureBlock {
+  id: string;
+  label: string;
+  description: string;
+  type: 'Input' | 'Process' | 'Output' | 'Storage';
 }
 
 /**
@@ -146,4 +129,7 @@ export interface NotionResponse {
 }
 
 // 하위 호환성을 위한 별칭
-export type SourceItem = Source;
+export type Source = SourceItem;
+export type MarketSignal = TrendSignal;
+export type ActionIdea = MDActionItem;
+
