@@ -24,14 +24,6 @@ interface ReportResultProps {
   onSaveToNotion: () => void;
 }
 
-const DEFAULT_VERIFIED_SOURCES: Source[] = [
-  { title: '네이버 D2 엔지니어링 기술 블로그', uri: 'https://d2.naver.com' },
-  { title: '토스 테크 블로그 (toss.tech)', uri: 'https://toss.tech' },
-  { title: '카카오 테크 공식 블로그', uri: 'https://tech.kakao.com' },
-  { title: '당근 엔지니어링 블로그 (Medium)', uri: 'https://medium.com/daangn' },
-  { title: 'GeekNews 최신 IT/개발자 트렌드', uri: 'https://news.hada.io' }
-];
-
 export const ReportResult: React.FC<ReportResultProps> = ({
   report,
   sources,
@@ -48,7 +40,19 @@ export const ReportResult: React.FC<ReportResultProps> = ({
   const [selectedMetric, setSelectedMetric] = useState<'sources' | 'factcheck' | 'volume' | 'queries' | null>('sources');
   const [chartViewMode, setChartViewMode] = useState<'bar' | 'matrix'>('bar');
 
-  const effectiveSources = sources && sources.length > 0 ? sources : DEFAULT_VERIFIED_SOURCES;
+  const effectiveSources = sources ?? [];
+
+  const originalSourceCount = effectiveSources.filter(
+    (source) => source.sourceType === "original"
+  ).length;
+
+  const redirectSourceCount = effectiveSources.filter(
+    (source) => source.sourceType === "grounding_redirect"
+  ).length;
+
+  const hasOriginalSources = originalSourceCount > 0;
+  const hasOnlyRedirectSources =
+    effectiveSources.length > 0 && !hasOriginalSources;
 
   const { cleanReport, dashboardData } = useMemo(() => {
     let cleanReport = report;
@@ -84,20 +88,25 @@ export const ReportResult: React.FC<ReportResultProps> = ({
   }, [cleanReport]);
 
   const verifiedTopics = useMemo(() => {
-    if (dashboardData?.topTrends && dashboardData.topTrends.length > 0) {
-      return dashboardData.topTrends.map((t, idx) => ({
-        name: t.title || (t.keyItems && t.keyItems[0]) || '핵심 기술 스택',
-        confidence: `${Math.min(99, 94 + (idx % 5))}%`,
-        sourcesCount: `${Math.min(effectiveSources.length, 2 + (idx % 3))}곳 독립 출처 교차 확인`
-      }));
+    if (!dashboardData?.topTrends?.length) {
+      return [];
     }
-    return [
-      { name: 'Microservices Observability & Tracing', confidence: '99.2%', sourcesCount: '네이버, 토스, 카카오 공통' },
-      { name: 'Kafka & Event-Driven Architecture', confidence: '98.5%', sourcesCount: '당근, 토스 공통' },
-      { name: 'Vector Search & RAG Hybrid Search', confidence: '97.8%', sourcesCount: '카카오, 당근 공통' },
-      { name: 'Kubernetes HPA & Auto-scaling', confidence: '96.4%', sourcesCount: '네이버, GeekNews 공통' }
-    ];
-  }, [dashboardData, effectiveSources]);
+
+    return dashboardData.topTrends.map((trend) => ({
+      name: trend.title || trend.keyItems?.[0] || "제목 없음",
+      sourcesCount: effectiveSources.length,
+
+      // 원문 URL이 없으면 confidence 수치를 만들지 않음
+      confidence: hasOriginalSources
+        ? Math.min(90, 65 + originalSourceCount * 5)
+        : 0,
+    }));
+  }, [
+    dashboardData,
+    effectiveSources.length,
+    hasOriginalSources,
+    originalSourceCount,
+  ]);
 
   if (!dashboardData) {
     return (
@@ -113,30 +122,32 @@ export const ReportResult: React.FC<ReportResultProps> = ({
           </h2>
           <div className="flex flex-col sm:flex-row gap-2.5">
             <button
-              onClick={notionUrl ? () => window.open(notionUrl, '_blank') : onSaveToNotion}
-              disabled={isSavingToNotion}
+              onClick={
+                notionUrl
+                  ? () => window.open(notionUrl, "_blank")
+                  : onSaveToNotion
+              }
+              disabled={isSavingToNotion || (!notionUrl && !hasOriginalSources)}
+              title={
+                !notionUrl && !hasOriginalSources
+                  ? "직접 원문 URL이 확인된 뒤 저장할 수 있습니다."
+                  : undefined
+              }
               className={`px-5 py-3 rounded-xl transition-all flex items-center justify-center gap-2 text-sm font-bold w-full sm:w-auto ${
-                isSavingToNotion 
-                  ? 'bg-neutral-400 text-white cursor-not-allowed'
-                  : 'bg-neutral-900 hover:bg-neutral-800 text-white'
+                isSavingToNotion || (!notionUrl && !hasOriginalSources)
+                  ? "bg-neutral-300 text-neutral-500 cursor-not-allowed"
+                  : "bg-neutral-900 hover:bg-neutral-800 text-white"
               }`}
             >
-              {notionUrl ? (
-                <>
-                  <ExternalLink className="w-4 h-4" />
-                  <span>노션에서 열기</span>
-                </>
-              ) : isSavingToNotion ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  <span>저장 중...</span>
-                </>
-              ) : (
-                <>
-                  <Layers className="w-4 h-4" />
-                  <span>노션에 저장</span>
-                </>
-              )}
+              <Layers className="w-4 h-4" />
+
+              <span>
+                {notionUrl
+                  ? "Notion 열기"
+                  : hasOriginalSources
+                    ? "Notion에 저장"
+                    : "원문 URL 확인 필요"}
+              </span>
             </button>
             <button
               onClick={onDownload}
@@ -179,6 +190,39 @@ export const ReportResult: React.FC<ReportResultProps> = ({
       animate={{ opacity: 1, y: 0 }}
       className="space-y-20 pb-32 max-w-7xl mx-auto"
     >
+      {/* Evidence Status Banner */}
+      <section
+        className={`rounded-2xl border p-5 ${
+          hasOriginalSources
+            ? "border-emerald-200 bg-emerald-50 text-emerald-950"
+            : hasOnlyRedirectSources
+              ? "border-amber-200 bg-amber-50 text-amber-950"
+              : "border-red-200 bg-red-50 text-red-950"
+        }`}
+      >
+        <div className="flex items-start gap-3">
+          <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" />
+
+          <div>
+            <p className="text-sm font-bold">
+              {hasOriginalSources
+                ? "Evidence status: 원문 링크 포함"
+                : hasOnlyRedirectSources
+                  ? "Evidence status: Grounding redirect만 수집됨"
+                  : "Evidence status: 출처 메타데이터 없음"}
+            </p>
+
+            <p className="mt-1 text-xs leading-relaxed opacity-90">
+              {hasOriginalSources
+                ? `직접 원문 링크 ${originalSourceCount}건과 전체 source 메타데이터 ${effectiveSources.length}건을 수집했습니다.`
+                : hasOnlyRedirectSources
+                  ? "현재 링크는 Google Search Grounding이 제공한 redirect 메타데이터입니다. 원문 URL을 직접 확인한 상태는 아닙니다."
+                  : "분석 본문은 생성되었지만, 검색 기반 source 메타데이터를 추출하지 못했습니다. 결과는 참고용 초안으로만 사용하세요."}
+            </p>
+          </div>
+        </div>
+      </section>
+
       {/* Header Actions */}
       <div className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center sm:justify-between sticky top-24 z-[90] bg-white/95 backdrop-blur-md p-4 md:p-6 rounded-2xl border border-neutral-200 shadow-sm">
         <h2 className="text-xl md:text-2xl font-bold tracking-tight text-neutral-900 flex items-center gap-3">
@@ -187,30 +231,32 @@ export const ReportResult: React.FC<ReportResultProps> = ({
         </h2>
         <div className="flex flex-col sm:flex-row gap-2.5">
           <button
-            onClick={notionUrl ? () => window.open(notionUrl, '_blank') : onSaveToNotion}
-            disabled={isSavingToNotion}
+            onClick={
+              notionUrl
+                ? () => window.open(notionUrl, "_blank")
+                : onSaveToNotion
+            }
+            disabled={isSavingToNotion || (!notionUrl && !hasOriginalSources)}
+            title={
+              !notionUrl && !hasOriginalSources
+                ? "직접 원문 URL이 확인된 뒤 저장할 수 있습니다."
+                : undefined
+            }
             className={`px-5 py-3 rounded-xl transition-all flex items-center justify-center gap-2 text-sm font-bold w-full sm:w-auto ${
-              isSavingToNotion 
-                ? 'bg-neutral-400 text-white cursor-not-allowed'
-                : 'bg-neutral-900 hover:bg-neutral-800 text-white'
+              isSavingToNotion || (!notionUrl && !hasOriginalSources)
+                ? "bg-neutral-300 text-neutral-500 cursor-not-allowed"
+                : "bg-neutral-900 hover:bg-neutral-800 text-white"
             }`}
           >
-            {notionUrl ? (
-              <>
-                <ExternalLink className="w-4 h-4" />
-                <span>노션에서 열기</span>
-              </>
-            ) : isSavingToNotion ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                <span>저장 중...</span>
-              </>
-            ) : (
-              <>
-                <Layers className="w-4 h-4" />
-                <span>노션에 저장</span>
-              </>
-            )}
+            <Layers className="w-4 h-4" />
+
+            <span>
+              {notionUrl
+                ? "Notion 열기"
+                : hasOriginalSources
+                  ? "Notion에 저장"
+                  : "원문 URL 확인 필요"}
+            </span>
           </button>
           <button
             onClick={onDownload}
@@ -239,7 +285,7 @@ export const ReportResult: React.FC<ReportResultProps> = ({
             </div>
             <div className="flex items-center gap-2 bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 px-3 py-1 rounded-lg text-xs font-bold">
               <Database className="w-3.5 h-3.5 text-emerald-400" />
-              <span>실제 검증/요약 문서: {effectiveSources.length}건</span>
+              <span>수집 문서: {effectiveSources.length}건 (원문 {originalSourceCount}건)</span>
             </div>
             <div className="flex items-center gap-2 bg-slate-800 text-slate-300 border border-slate-700 px-3 py-1 rounded-lg text-xs font-medium">
               <Globe className="w-3.5 h-3.5 text-amber-400" />
@@ -247,7 +293,7 @@ export const ReportResult: React.FC<ReportResultProps> = ({
             </div>
           </div>
           <span className="text-[11px] text-slate-400 font-medium">
-            * 선택된 탐색 기간 내 최신 공식 테크 블로그에서 원문과 링크를 직접 수집했습니다.
+            * Google Search Grounding 기반 참고 링크와 출처 메타데이터 목록입니다.
           </span>
         </div>
 
@@ -255,17 +301,17 @@ export const ReportResult: React.FC<ReportResultProps> = ({
           <div className="space-y-1.5">
             <div className="inline-flex items-center gap-2 px-3.5 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-full text-xs font-bold">
               <ShieldCheck className="w-4 h-4 text-emerald-600" />
-              <span>구글 서치 그라운딩 &amp; 팩트 검증 대시보드</span>
+              <span>구글 서치 그라운딩 &amp; 출처 메타데이터 대시보드</span>
             </div>
-            <h3 className="text-xl md:text-2xl font-black tracking-tight text-slate-900">데이터 수집 및 팩트체크 검증 지표</h3>
+            <h3 className="text-xl md:text-2xl font-black tracking-tight text-slate-900">데이터 수집 및 출처 메타데이터 상태</h3>
             <p className="text-xs md:text-sm text-slate-600 font-medium">
-              AI 모델의 환각(Hallucination)을 방지하고 실제 기술 아티클 원문을 검증하는 4가지 타당성 지표입니다. 각 카드를 클릭하면 원출처 링크와 세부 검증 내역이 카드 아래에 표시됩니다.
+              출처 기반 분석 상태를 표시합니다. 각 카드를 클릭하면 Google Search Grounding 기반 참고 링크와 세부 메타데이터 내역이 카드 아래에 표시됩니다.
             </p>
           </div>
           {sources.length > 0 && (
             <div className="flex items-center gap-2 bg-slate-50 px-4 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 shrink-0">
               <Sparkles className="w-4 h-4 text-amber-500" />
-              <span>{effectiveSources.length}개 실시간 원문 검증 링크 매핑</span>
+              <span>{effectiveSources.length}개 Google Grounding Source Metadata 매핑</span>
             </div>
           )}
         </div>
@@ -286,14 +332,14 @@ export const ReportResult: React.FC<ReportResultProps> = ({
               <div className="space-y-1 flex-1">
                 <div className="flex items-center gap-2 text-indigo-600 font-bold text-xs uppercase tracking-wider">
                   <Globe className="w-4 h-4" />
-                  <span>실시간 수집 원문 출처</span>
+                  <span>수집 출처 메타데이터</span>
                 </div>
                 <div className="text-2xl md:text-3xl font-black text-slate-900">
-                  {sources.length > 0 ? sources.length : (factMetrics?.totalSourcesCollected || 12)}{' '}
-                  <span className="text-sm font-bold text-slate-500">개 아티클</span>
+                  {effectiveSources.length}{' '}
+                  <span className="text-sm font-bold text-slate-500">개 항목 (원문 {originalSourceCount}건)</span>
                 </div>
                 <p className="text-xs text-slate-600 font-medium">
-                  네카라쿠배당토 &amp; 글로벌 빅테크 공식 엔지니어링 블로그 수집
+                  Google Grounding 기반 수집 출처
                 </p>
               </div>
               <div className={`p-2 rounded-xl border transition-colors ${
@@ -316,17 +362,18 @@ export const ReportResult: React.FC<ReportResultProps> = ({
                   <div className="flex items-center justify-between pb-2 border-b border-indigo-100">
                     <span className="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
                       <Info className="w-4 h-4 text-indigo-600" />
-                      지표 타당성: AI의 자체 지식에 의존하지 않고 Google Search Grounding으로 검증 및 수집한 원문 URL 목록입니다.
+                      지표 타당성: 분석 과정에서 반환된 source 메타데이터 링크 목록입니다.
                     </span>
                   </div>
 
                   <div className="grid grid-cols-1 gap-2.5">
                     {effectiveSources.map((source, idx) => {
-                      let domain = 'Web Source';
+                      const isRedirect = source.sourceType === "grounding_redirect";
+                      let displayDomain = "Web Source";
                       try {
-                        domain = new URL(source.uri).hostname.replace('www.', '');
+                        displayDomain = new URL(source.uri).hostname.replace("www.", "");
                       } catch {
-                        domain = 'Web Article';
+                        displayDomain = "Web Article";
                       }
                       return (
                         <a
@@ -338,10 +385,16 @@ export const ReportResult: React.FC<ReportResultProps> = ({
                         >
                           <div className="space-y-1 min-w-0 flex-1">
                             <div className="flex items-center gap-2 text-[11px] font-bold text-indigo-600">
-                              <Globe className="w-3.5 h-3.5" />
-                              <span>{domain}</span>
-                              <span className="text-[10px] bg-indigo-50 text-indigo-700 px-1.5 py-0.2 rounded font-mono">
-                                [원문 출처 {idx + 1}]
+                              <Globe className="w-3.5 h-3.5 text-indigo-500" />
+                              <span>{displayDomain}</span>
+                              <span
+                                className={`rounded px-1.5 py-0.5 font-mono text-[10px] ${
+                                  isRedirect
+                                    ? "bg-amber-50 text-amber-700"
+                                    : "bg-emerald-50 text-emerald-700"
+                                }`}
+                              >
+                                {isRedirect ? "GROUNDING REDIRECT" : "ORIGINAL URL"}
                               </span>
                             </div>
                             <h5 className="text-xs md:text-sm font-extrabold text-slate-900 group-hover:text-indigo-900 line-clamp-1">
@@ -349,7 +402,7 @@ export const ReportResult: React.FC<ReportResultProps> = ({
                             </h5>
                           </div>
                           <div className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 group-hover:bg-indigo-600 text-indigo-700 group-hover:text-white rounded-lg text-xs font-bold transition-colors shrink-0">
-                            <span>원문 검증하기</span>
+                            <span>{isRedirect ? "Grounding 링크 열기" : "원문 열기"}</span>
                             <ArrowUpRight className="w-3.5 h-3.5" />
                           </div>
                         </a>
@@ -375,13 +428,13 @@ export const ReportResult: React.FC<ReportResultProps> = ({
               <div className="space-y-1 flex-1">
                 <div className="flex items-center gap-1.5 text-emerald-600 font-bold text-xs uppercase tracking-wider">
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>교차 검증된 기술 주제</span>
+                  <span>분석 주제 및 근거 상태</span>
                 </div>
                 <div className="text-2xl font-bold text-neutral-900">
-                  {verifiedTopics.length} <span className="text-sm font-semibold text-neutral-500">개 검증 완료</span>
+                  {verifiedTopics.length} <span className="text-sm font-semibold text-neutral-500">개 항목</span>
                 </div>
                 <p className="text-xs text-neutral-500 font-medium">
-                  다중 독립 블로그 및 컨퍼런스 자료 상호 매칭된 기술 스택
+                  수집된 출처 메타데이터 연계 분석 항목
                 </p>
               </div>
               <div className={`p-2 rounded-xl border transition-colors ${
@@ -404,10 +457,10 @@ export const ReportResult: React.FC<ReportResultProps> = ({
                   <div className="flex items-center justify-between pb-2 border-b border-emerald-100">
                     <span className="text-xs font-semibold text-emerald-900 flex items-center gap-1.5">
                       <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                      독립 아티클 간 상호 검증 완료 항목
+                      수집된 출처 기반 주요 분석 주제
                     </span>
                     <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded">
-                      Grounding 팩트 매칭
+                      Grounding 매칭
                     </span>
                   </div>
 
@@ -420,11 +473,13 @@ export const ReportResult: React.FC<ReportResultProps> = ({
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0">
                           <span className="text-[10px] text-neutral-500 bg-neutral-100 px-2 py-0.5 rounded font-mono">
-                            {topic.sourcesCount}
+                            {topic.sourcesCount}개 소스
                           </span>
-                          <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded">
-                            {topic.confidence}
-                          </span>
+                          {topic.confidence > 0 && (
+                            <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded">
+                              {topic.confidence}%
+                            </span>
+                          )}
                         </div>
                       </div>
                     ))}

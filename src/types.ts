@@ -29,6 +29,12 @@ export interface SourceItem {
   uri: string;
   type?: 'TechBlog' | 'Conference' | 'Wiki' | 'Community' | 'News';
   snippet?: string;
+
+  // 실제 원문 URL인지, Google Grounding redirect인지 구분
+  sourceType?: "original" | "grounding_redirect";
+
+  // UI에 보여줄 상태 라벨
+  statusLabel?: "원문 링크" | "Grounding redirect";
 }
 
 /**

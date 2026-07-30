@@ -7,6 +7,86 @@ import { ReportResult } from './components/ReportResult';
 import { analyzeTrend } from './services/geminiService';
 import { Source, NotionResponse, Period, AnalysisPurpose, FactMetrics } from './types';
 
+const isGroundingRedirect = (uri: string) => {
+  try {
+    const hostname = new URL(uri).hostname.toLowerCase();
+
+    return (
+      hostname === "vertexaisearch.cloud.google.com" ||
+      hostname.endsWith(".vertexaisearch.cloud.google.com")
+    );
+  } catch {
+    return false;
+  }
+};
+
+const normalizeSources = (items: Source[]): Source[] => {
+  const validSources = items.filter((source) => {
+    return (
+      source &&
+      typeof source.title === "string" &&
+      source.title.trim().length > 0 &&
+      typeof source.uri === "string" &&
+      source.uri.startsWith("http")
+    );
+  });
+
+  const normalized = validSources.map((source) => {
+    const isRedirect = isGroundingRedirect(source.uri);
+
+    return {
+      ...source,
+      title: source.title.trim(),
+      uri: source.uri.trim(),
+      sourceType: isRedirect
+        ? ("grounding_redirect" as const)
+        : ("original" as const),
+      statusLabel: isRedirect
+        ? ("Grounding redirect" as const)
+        : ("원문 링크" as const),
+    };
+  });
+
+  // 같은 URL은 한 번만 유지
+  return Array.from(
+    new Map(normalized.map((source) => [source.uri, source])).values()
+  );
+};
+
+const getEvidenceStatus = (items: Source[]) => {
+  const originalCount = items.filter(
+    (source) => source.sourceType === "original"
+  ).length;
+
+  const redirectCount = items.filter(
+    (source) => source.sourceType === "grounding_redirect"
+  ).length;
+
+  if (originalCount > 0) {
+    return {
+      status: "grounded" as const,
+      label: "원문 링크 포함",
+      message: `직접 원문 링크 ${originalCount}건을 포함합니다.`,
+    };
+  }
+
+  if (redirectCount > 0) {
+    return {
+      status: "redirect_only" as const,
+      label: "Grounding redirect만 수집됨",
+      message:
+        "Google Search Grounding의 redirect 메타데이터만 수집되었습니다. 직접 원문 URL 검증은 완료되지 않았습니다.",
+    };
+  }
+
+  return {
+    status: "missing" as const,
+    label: "출처 메타데이터 없음",
+    message:
+      "검색 기반 출처 메타데이터를 추출하지 못했습니다. 이 결과는 검증된 리포트로 저장하면 안 됩니다.",
+  };
+};
+
 const App: React.FC = () => {
   const [period, setPeriod] = useState<Period>('최근 1주');
   const [selectedCategories, setSelectedCategories] = useState<string[]>(['백엔드 / MSA', '클라우드 / DevOps']);
@@ -134,71 +214,112 @@ console.log(
   response?.candidates?.[0]?.groundingMetadata?.groundingChunks
 );
 
-      let reportText = response.text || '';
+      let reportText = response.text || "";
 
-      const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
+      const groundingChunks =
+        response.candidates?.[0]?.groundingMetadata?.groundingChunks ?? [];
+
       let extractedSources: Source[] = [];
-      
-      if (groundingChunks) {
-        reportText = reportText.replace(/\[([\d\s,\.]+)\]/g, (match, p1) => {
-          const numbers = p1.split(',').map((n: string) => n.trim()).filter((n: string) => n !== '' && !isNaN(Number(n)));
-          if (numbers.length > 0) {
-            return numbers.map((n: string) => `[${n}]`).join('');
-          }
-          return match;
-        });
 
-        groundingChunks.forEach((chunk) => {
-          if (chunk.web) {
-            const title = chunk.web.title || '출처 확인';
-            const uri = chunk.web.uri || '#';
-            extractedSources.push({ title, uri });
-          }
-        });
+      // 1) Gemini Google Search Grounding metadata에서 source 추출
+      groundingChunks.forEach((chunk: any) => {
+        const title = chunk?.web?.title;
+        const uri = chunk?.web?.uri;
 
-        reportText = reportText.replace(/\[\s*(?:출처\s*)?(\d{1,2})(?:\.(\d{1,2}))?\s*\]/g, (match, p1, p2) => {
-          let sourceIndex = -1;
-          if (p2) {
-            sourceIndex = parseInt(p2, 10) - 1;
-          } else {
-            sourceIndex = parseInt(p1, 10) - 1;
-          }
+        if (title && uri) {
+          extractedSources.push({
+            title,
+            uri,
+          });
+        }
+      });
 
-          if (sourceIndex >= 0 && sourceIndex < extractedSources.length) {
-            const source = extractedSources[sourceIndex];
+      // 2) 서비스 레이어가 별도 source 배열을 반환했다면 함께 합침
+      if (Array.isArray(response.sources) && response.sources.length > 0) {
+        extractedSources = [
+          ...extractedSources,
+          ...response.sources,
+        ];
+      }
+
+      // 3) URL 유효성 검사, 중복 제거, redirect 구분
+      const normalizedSources = normalizeSources(extractedSources);
+
+      // 4) source가 실제로 존재하면 본문 숫자 인용을 링크로 변환
+      if (normalizedSources.length > 0) {
+        reportText = reportText.replace(
+          /\[\s*(?:출처\s*)?(\d{1,2})(?:\.(\d{1,2}))?\s*\]/g,
+          (match, p1, p2) => {
+            const sourceNumber = p2 ? Number(p2) : Number(p1);
+            const sourceIndex = sourceNumber - 1;
+            const source = normalizedSources[sourceIndex];
+
+            if (!source) {
+              return match;
+            }
+
             return `[[${sourceIndex + 1}]](${source.uri})`;
           }
-          
-          return match;
-        });
-        if (response.sources && Array.isArray(response.sources) && response.sources.length > 0) {
-          extractedSources = response.sources;
-        }
-
-        setSources(extractedSources);
-      } else if (response.sources && Array.isArray(response.sources)) {
-        setSources(response.sources);
+        );
       }
 
-      if (response.factMetrics) {
-        setFactMetrics(response.factMetrics);
-      } else {
-        setFactMetrics({
-          totalSourcesCollected: extractedSources.length,
-          searchQueriesExecuted: [
-            `${selectedCategories.join(' ')} ${dataSources[0] || ''} 트렌드`,
-            `${keyword || '기술 아티클'} 엔지니어링 블로그`
-          ],
-          factCheckConfidenceScore: extractedSources.length > 0 ? Math.min(99, 92 + extractedSources.length * 1.5) : 95.0,
-          crossValidationSourcesCount: Math.max(1, extractedSources.length),
-          dataVolumeEstKb: Math.floor(180 + (reportText?.length || 0) / 8)
-        });
+      // 5) source state는 response.sources 존재 여부와 상관없이 항상 저장
+      setSources(normalizedSources);
+
+      const evidence = getEvidenceStatus(normalizedSources);
+
+      console.log("NORMALIZED SOURCES", normalizedSources);
+      console.log("EVIDENCE STATUS", evidence);
+
+      // source가 하나도 없으면 사용자에게 명확히 알림
+      if (evidence.status === "missing") {
+        showToast(
+          "출처 메타데이터를 추출하지 못했습니다. 결과는 참고용 초안으로만 사용하세요.",
+          "error"
+        );
       }
+
+      // redirect URL만 있으면 원문 검증 완료가 아니라는 점을 명시
+      if (evidence.status === "redirect_only") {
+        showToast(
+          "Google Grounding redirect 링크만 수집되었습니다. 직접 원문 URL 검증은 아직 완료되지 않았습니다.",
+          "info"
+        );
+      }
+
+      // 실제 source 수만 기반으로 메트릭 생성
+      setFactMetrics({
+        totalSourcesCollected: normalizedSources.length,
+        searchQueriesExecuted: [
+          `${selectedCategories.join(" ")} ${dataSources[0] || ""} 트렌드`,
+          `${keyword || "기술 아티클"} 엔지니어링 블로그`,
+        ],
+        factCheckConfidenceScore:
+          evidence.status === "grounded"
+            ? Math.min(90, 70 + normalizedSources.length * 5)
+            : evidence.status === "redirect_only"
+              ? 50
+              : 0,
+        crossValidationSourcesCount:
+          evidence.status === "grounded"
+            ? normalizedSources.filter(
+                (source) => source.sourceType === "original"
+              ).length
+            : 0,
+        dataVolumeEstKb: Math.floor(
+          180 + (reportText?.length || 0) / 8
+        ),
+      });
 
       setReport(reportText);
 
       // Auto-save to Notion
-      if (!isSavingToNotion) {
+      // 직접 원문 URL이 하나 이상 있을 때만 자동 저장
+      const hasOriginalSource = normalizedSources.some(
+        (source) => source.sourceType === "original"
+      );
+
+      if (hasOriginalSource && !isSavingToNotion) {
         setIsSavingToNotion(true);
         let cleanMarkdown = reportText;
         let notionPayload = null;
@@ -228,7 +349,11 @@ console.log(
               targetAges: targetAges.join(', '),
               purpose,
               date: new Date().toISOString().slice(0, 10),
-              notionPayload 
+              notionPayload,
+
+              // source evidence 메타데이터
+              sources: normalizedSources,
+              evidenceStatus: getEvidenceStatus(normalizedSources),
             })
           });
           
@@ -252,6 +377,17 @@ console.log(
         } finally {
           setIsSavingToNotion(false);
         }
+      }
+
+      if (!hasOriginalSource) {
+        console.warn(
+          "Notion auto-save skipped: no direct original source URL was verified."
+        );
+
+        showToast(
+          "직접 원문 URL이 확인되지 않아 Notion 자동 저장을 건너뛰었습니다.",
+          "info"
+        );
       }
 
     } catch (error: any) {
@@ -300,6 +436,19 @@ console.log(
 
   const handleSaveToNotion = async () => {
     if (isSavingToNotion) return;
+
+    const hasOriginalSource = sources.some(
+      (source) => source.sourceType === "original"
+    );
+
+    if (!hasOriginalSource) {
+      showToast(
+        "직접 원문 URL이 확인되지 않았습니다. Grounding redirect만 있는 리포트는 Notion에 검증 자료로 저장할 수 없습니다.",
+        "error"
+      );
+      return;
+    }
+
     setIsSavingToNotion(true);
 
     let cleanMarkdown = report;
@@ -331,7 +480,11 @@ console.log(
           targetAges: targetAges.join(', '),
           purpose,
           date: new Date().toISOString().slice(0, 10),
-          notionPayload 
+          notionPayload,
+
+          // source evidence 메타데이터
+          sources,
+          evidenceStatus: getEvidenceStatus(sources),
         })
       });
       
