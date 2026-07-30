@@ -1,3 +1,5 @@
+import type { TemplateId } from "../config/reportTemplates";
+
 export const analyzeTrend = async (
   period: string,
   selectedCategories: string[],
@@ -6,7 +8,8 @@ export const analyzeTrend = async (
   dataSources: string[],
   keyword: string,
   articleCount: number,
-  imageBase64: string | null = null
+  imageBase64: string | null = null,
+  templateId: TemplateId = "korean-engineering"
 ) => {
   const res = await fetch('/api/analyze', {
     method: 'POST',
@@ -22,6 +25,7 @@ export const analyzeTrend = async (
       keyword,
       articleCount,
       imageBase64,
+      templateId,
     }),
   });
 

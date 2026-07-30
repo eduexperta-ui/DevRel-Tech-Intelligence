@@ -5,7 +5,8 @@ import { ArchitectureDiagram } from './components/ArchitectureDiagram';
 import { IntelligenceConfigPanel } from './components/IntelligenceConfigPanel';
 import { ReportResult } from './components/ReportResult';
 import { analyzeTrend } from './services/geminiService';
-import { Source, NotionResponse, Period, AnalysisPurpose, FactMetrics } from './types';
+import { Source, normalizeSource, NotionResponse, Period, AnalysisPurpose, FactMetrics } from './types';
+import { TemplateId, getTemplate, getTemplateKeywordsText } from './config/reportTemplates';
 
 const isGroundingRedirect = (uri: string) => {
   try {
@@ -42,8 +43,8 @@ const normalizeSources = (items: Source[]): Source[] => {
         ? ("grounding_redirect" as const)
         : ("original" as const),
       statusLabel: isRedirect
-        ? ("Grounding redirect" as const)
-        : ("원문 링크" as const),
+        ? ("GROUNDING REDIRECT" as const)
+        : ("ORIGINAL URL" as const),
     };
   });
 
@@ -88,12 +89,13 @@ const getEvidenceStatus = (items: Source[]) => {
 };
 
 const App: React.FC = () => {
-  const [period, setPeriod] = useState<Period>('최근 1주');
-  const [selectedCategories, setSelectedCategories] = useState<string[]>(['백엔드 / MSA', '클라우드 / DevOps']);
+  const [templateId, setTemplateId] = useState<TemplateId>('korean-engineering');
+  const [period, setPeriod] = useState<Period>('recent30');
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(['백엔드 / MSA', '클라우드 / DevOps', 'AI / ML / RAG']);
   const [targetAges, setTargetAges] = useState<string[]>(['주니어 개발자', '시니어 / 리드']);
-  const [purpose, setPurpose] = useState<AnalysisPurpose>('테크블로그 주제 선정');
+  const [purpose, setPurpose] = useState<AnalysisPurpose>('tech-blog');
   const [dataSources, setDataSources] = useState<string[]>(['국내 대표 테크 블로그 (네카라쿠배당토 등)', '글로벌 빅테크 엔지니어링 블로그 (Google, Netflix, Uber, AWS 등)']);
-  const [keyword, setKeyword] = useState('');
+  const [keyword, setKeyword] = useState('MSA, RAG, Kubernetes, Observability, DevOps');
   const [articleCount, setArticleCount] = useState<number>(20);
   const [image, setImage] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -117,6 +119,28 @@ const App: React.FC = () => {
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setToastMsg({ message, type });
     setTimeout(() => setToastMsg(null), 8000);
+  };
+
+  const applyTemplate = (nextTemplateId: TemplateId) => {
+    const template = getTemplate(nextTemplateId);
+
+    setTemplateId(template.id);
+    setPeriod(template.defaultPeriod as Period);
+    setSelectedCategories(template.defaultCategories);
+    setDataSources(template.defaultDataSources);
+    setKeyword(getTemplateKeywordsText(template));
+    setPurpose(template.defaultPurpose as AnalysisPurpose);
+    setArticleCount(template.defaultArticleCount);
+
+    setReport('');
+    setSources([]);
+    setFactMetrics(null);
+    setNotionUrl(null);
+
+    showToast(
+      `"${template.title}" 템플릿을 적용했습니다. 검색 범위와 리포트 구조가 설정되었습니다.`,
+      "info"
+    );
   };
 
 
@@ -205,7 +229,8 @@ const App: React.FC = () => {
         dataSources, 
         keyword, 
         articleCount, 
-        image
+        image,
+        templateId
       );
 
        console.log("RAW GEMINI RESPONSE", response);
@@ -227,10 +252,7 @@ console.log(
         const uri = chunk?.web?.uri;
 
         if (title && uri) {
-          extractedSources.push({
-            title,
-            uri,
-          });
+          extractedSources.push(normalizeSource(title, uri));
         }
       });
 
@@ -287,28 +309,25 @@ console.log(
         );
       }
 
-      // 실제 source 수만 기반으로 메트릭 생성
+      const originalCount = normalizedSources.filter((s) => s.sourceType === "original").length;
+      const redirectCount = normalizedSources.filter((s) => s.sourceType === "grounding_redirect").length;
+      const evidenceStatusStr = originalCount > 0 ? ("has_original_sources" as const) : redirectCount > 0 ? ("redirect_only" as const) : ("no_sources" as const);
+
       setFactMetrics({
         totalSourcesCollected: normalizedSources.length,
+        originalSourceCount: originalCount,
+        groundingRedirectCount: redirectCount,
+        uniqueDomainCount: new Set(
+          normalizedSources.map((s) => {
+            try { return new URL(s.uri).hostname; } catch { return s.uri; }
+          })
+        ).size,
         searchQueriesExecuted: [
           `${selectedCategories.join(" ")} ${dataSources[0] || ""} 트렌드`,
           `${keyword || "기술 아티클"} 엔지니어링 블로그`,
         ],
-        factCheckConfidenceScore:
-          evidence.status === "grounded"
-            ? Math.min(90, 70 + normalizedSources.length * 5)
-            : evidence.status === "redirect_only"
-              ? 50
-              : 0,
-        crossValidationSourcesCount:
-          evidence.status === "grounded"
-            ? normalizedSources.filter(
-                (source) => source.sourceType === "original"
-              ).length
-            : 0,
-        dataVolumeEstKb: Math.floor(
-          180 + (reportText?.length || 0) / 8
-        ),
+        evidenceStatus: evidenceStatusStr,
+        responseChars: reportText.length,
       });
 
       setReport(reportText);
@@ -316,7 +335,7 @@ console.log(
       // Auto-save to Notion
       // 직접 원문 URL이 하나 이상 있을 때만 자동 저장
       const hasOriginalSource = normalizedSources.some(
-        (source) => source.sourceType === "original"
+        (source) => source.sourceType === "original" || source.sourceType === "direct" || !source.isGroundingRedirect
       );
 
       if (hasOriginalSource && !isSavingToNotion) {
@@ -717,6 +736,8 @@ console.log(
             </div>
             
             <IntelligenceConfigPanel 
+              templateId={templateId}
+              onTemplateChange={applyTemplate}
               period={period}
               setPeriod={setPeriod}
               selectedCategories={selectedCategories}
