@@ -24,6 +24,8 @@ interface IntelligenceConfigPanelProps {
   setArticleCount: (count: number) => void;
   image: string | null;
   setImage: (image: string | null) => void;
+  activePresetId: string;
+  onPresetChange: (preset: DevRelPreset) => void;
   isAnalyzing: boolean;
   onAnalyze: () => void;
 }
@@ -45,11 +47,12 @@ export const IntelligenceConfigPanel: React.FC<IntelligenceConfigPanelProps> = (
   setArticleCount,
   image,
   setImage,
+  activePresetId,
+  onPresetChange,
   isAnalyzing,
   onAnalyze,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [activePresetId, setActivePresetId] = useState<string>('k-tech-leaders');
   const [showExpertMode, setShowExpertMode] = useState<boolean>(false);
 
   const activePreset = DEVREL_PRESETS.find(p => p.id === activePresetId) || DEVREL_PRESETS[0];
@@ -70,7 +73,6 @@ export const IntelligenceConfigPanel: React.FC<IntelligenceConfigPanelProps> = (
   };
 
   const applyPreset = (preset: DevRelPreset) => {
-    setActivePresetId(preset.id);
     setPeriod(preset.period as Period);
     setSelectedCategories(preset.selectedCategories);
     setTargetAges(preset.targetAges);
@@ -78,16 +80,32 @@ export const IntelligenceConfigPanel: React.FC<IntelligenceConfigPanelProps> = (
     setDataSources(preset.dataSources);
     setKeyword(''); // Clear typed keyword so preset's example keyword does NOT force auto-filtering
     setArticleCount(preset.articleCount);
+
+    onPresetChange(preset);
+  };
+
+  const notifyCustom = () => {
+    onPresetChange({
+      ...activePreset,
+      id: "custom",
+      title: "사용자 정의 탐색",
+      period,
+      selectedCategories,
+      targetAges,
+      purpose,
+      dataSources,
+      keyword,
+      articleCount,
+    });
   };
 
   const toggleItem = (list: string[], item: string, setter: (newList: string[]) => void) => {
-    // Modify fine-tuning will set preset to custom
-    setActivePresetId('custom');
     if (list.includes(item)) {
       setter(list.filter((i) => i !== item));
     } else {
       setter([...list, item]);
     }
+    notifyCustom();
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -243,7 +261,7 @@ export const IntelligenceConfigPanel: React.FC<IntelligenceConfigPanelProps> = (
                           const days = getDaysFromPeriod(period);
                           if (days > 1) {
                             setPeriod(getPeriodStringFromDays(days - 1));
-                            setActivePresetId('custom');
+                            notifyCustom();
                           }
                         }}
                         disabled={getDaysFromPeriod(period) <= 1}
@@ -262,7 +280,7 @@ export const IntelligenceConfigPanel: React.FC<IntelligenceConfigPanelProps> = (
                         onChange={(e) => {
                           const days = parseInt(e.target.value, 10);
                           setPeriod(getPeriodStringFromDays(days));
-                          setActivePresetId('custom');
+                          notifyCustom();
                         }}
                         className="w-full h-2 bg-neutral-200 rounded-lg appearance-none cursor-pointer accent-neutral-900 focus:outline-none"
                       />
@@ -273,7 +291,7 @@ export const IntelligenceConfigPanel: React.FC<IntelligenceConfigPanelProps> = (
                           const days = getDaysFromPeriod(period);
                           if (days < 90) {
                             setPeriod(getPeriodStringFromDays(days + 1));
-                            setActivePresetId('custom');
+                            notifyCustom();
                           }
                         }}
                         disabled={getDaysFromPeriod(period) >= 90}
@@ -330,7 +348,7 @@ export const IntelligenceConfigPanel: React.FC<IntelligenceConfigPanelProps> = (
                       value={purpose}
                       onChange={(e) => {
                         setPurpose(e.target.value as AnalysisPurpose);
-                        setActivePresetId('custom');
+                        notifyCustom();
                       }}
                       className="w-full p-2.5 bg-white border border-neutral-200 rounded-xl text-xs font-bold focus:border-neutral-900 outline-none transition-all appearance-none cursor-pointer text-neutral-900 pr-10 shadow-2xs"
                     >
@@ -423,7 +441,7 @@ export const IntelligenceConfigPanel: React.FC<IntelligenceConfigPanelProps> = (
                 value={keyword}
                 onChange={(e) => {
                   setKeyword(e.target.value);
-                  setActivePresetId('custom');
+                  notifyCustom();
                 }}
                 onKeyDown={(e) => e.key === 'Enter' && onAnalyze()}
                 placeholder="[선택] 직접 입력 시에만 탐색 키워드로 제한됩니다 (예: LLM, MSA, Kafka)"

@@ -14,18 +14,24 @@ export type AnalysisPurpose =
   | '카테고리 운영 전략';
 
 export type EvidenceStatus =
-  | "verified"          // 원문 URL + 발행일 + 본문 근거 확보
-  | "partially_verified" // 일부 원문 또는 메타데이터만 확보
-  | "unverified"        // 모델 언급은 있으나 원문 근거 미확보
-  | "duplicate"         // 기존 수집 건과 중복 가능성 높음
-  | "insufficient";     // 분석 판단 불가
+  | "verified"
+  | "partial"
+  | "partially_verified"
+  | "redirect_only"
+  | "unverified"
+  | "duplicate"
+  | "duplicate_review_needed"
+  | "insufficient";
 
 export type FactCheckStatus =
   | "verified"
   | "needs_source"
+  | "needs_title"
   | "needs_date"
   | "needs_duplicate_check"
   | "not_evaluable";
+
+export type SourceKind = "official" | "community" | "grounding_redirect" | "original";
 
 export interface EvidenceCoverage {
   sourceUrl: boolean;
@@ -37,7 +43,30 @@ export interface EvidenceCoverage {
 export interface DisplayPolicy {
   showScores: boolean;
   showMatrix: boolean;
+  showRanking?: boolean;
   reason: string;
+}
+
+export interface EvidenceSummary {
+  status: EvidenceStatus;
+  label: string;
+  message: string;
+
+  groundingSourceCount: number;
+  uniqueDomainCount: number;
+  directOriginalUrlCount: number;
+  verifiedTitleCount: number;
+  publishedAtCount: number;
+  duplicateCheckedCount: number;
+
+  factCheckStatus: FactCheckStatus;
+
+  displayPolicy: {
+    showScores: boolean;
+    showMatrix: boolean;
+    showRanking: boolean;
+    reason: string;
+  };
 }
 
 export interface FactMetrics {
@@ -57,16 +86,13 @@ export interface SourceItem {
   type?: 'TechBlog' | 'Conference' | 'Wiki' | 'Community' | 'News';
   snippet?: string;
 
-  // 실제 원문 URL인지, Google Grounding redirect인지 구분
-  sourceType?: "original" | "grounding_redirect";
+  sourceType?: SourceKind;
+  statusLabel?: string;
 
-  // UI에 보여줄 상태 라벨
-  statusLabel?: "원문 링크" | "Grounding redirect";
-
-  // 2D 매트릭스 조건 판별용 메타데이터
+  originalUrl?: string | null;
   url?: string;
-  publishedAt?: string;
-  duplicateStatus?: string;
+  publishedAt?: string | null;
+  duplicateStatus?: "not_checked" | "unique" | "possible_duplicate" | "duplicate" | string;
   evidenceQuotes?: string[];
 }
 

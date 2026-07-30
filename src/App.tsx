@@ -5,7 +5,8 @@ import { ArchitectureDiagram } from './components/ArchitectureDiagram';
 import { IntelligenceConfigPanel } from './components/IntelligenceConfigPanel';
 import { ReportResult } from './components/ReportResult';
 import { analyzeTrend } from './services/geminiService';
-import { Source, NotionResponse, Period, AnalysisPurpose, FactMetrics } from './types';
+import { Source, NotionResponse, Period, AnalysisPurpose, FactMetrics, EvidenceSummary, EvidenceStatus, FactCheckStatus, SourceItem } from './types';
+import { DEVREL_PRESETS, DevRelPreset } from './constants';
 
 const isGroundingRedirect = (uri: string) => {
   try {
@@ -53,41 +54,8 @@ const normalizeSources = (items: Source[]): Source[] => {
   );
 };
 
-const getEvidenceStatus = (items: Source[]) => {
-  const originalCount = items.filter(
-    (source) => source.sourceType === "original"
-  ).length;
-
-  const redirectCount = items.filter(
-    (source) => source.sourceType === "grounding_redirect"
-  ).length;
-
-  if (originalCount > 0) {
-    return {
-      status: "grounded" as const,
-      label: "원문 링크 포함",
-      message: `직접 원문 링크 ${originalCount}건을 포함합니다.`,
-    };
-  }
-
-  if (redirectCount > 0) {
-    return {
-      status: "redirect_only" as const,
-      label: "Grounding redirect만 수집됨",
-      message:
-        "Google Search Grounding의 redirect 메타데이터만 수집되었습니다. 직접 원문 URL 검증은 완료되지 않았습니다.",
-    };
-  }
-
-  return {
-    status: "missing" as const,
-    label: "출처 메타데이터 없음",
-    message:
-      "검색 기반 출처 메타데이터를 추출하지 못했습니다. 이 결과는 검증된 리포트로 저장하면 안 됩니다.",
-  };
-};
-
 const App: React.FC = () => {
+  const [activePreset, setActivePreset] = useState<DevRelPreset>(DEVREL_PRESETS[0]);
   const [period, setPeriod] = useState<Period>('최근 1주');
   const [selectedCategories, setSelectedCategories] = useState<string[]>(['백엔드 / MSA', '클라우드 / DevOps']);
   const [targetAges, setTargetAges] = useState<string[]>(['주니어 개발자', '시니어 / 리드']);
@@ -101,6 +69,7 @@ const App: React.FC = () => {
   const [progress, setProgress] = useState(0);
   const [report, setReport] = useState('');
   const [sources, setSources] = useState<Source[]>([]);
+  const [evidenceSummary, setEvidenceSummary] = useState<EvidenceSummary | null>(null);
   const [factMetrics, setFactMetrics] = useState<FactMetrics | null>(null);
   const [notionUrl, setNotionUrl] = useState<string | null>(null);
   const [copyStatus, setCopyStatus] = useState<'idle' | 'copied'>('idle');
@@ -117,6 +86,100 @@ const App: React.FC = () => {
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setToastMsg({ message, type });
     setTimeout(() => setToastMsg(null), 8000);
+  };
+
+  const buildEvidenceSummary = (extractedSources: SourceItem[]): EvidenceSummary => {
+    const groundingSourceCount = extractedSources.length;
+
+    const directOriginalUrlCount = extractedSources.filter((s) => {
+      const isOriginal = s.sourceType === "original";
+      const hasOriginalUrl = !!s.originalUrl;
+      const uriIsNotRedirect = !s.uri.includes("google.com/url") && !isGroundingRedirect(s.uri);
+      return isOriginal || hasOriginalUrl || uriIsNotRedirect;
+    }).length;
+
+    const uniqueDomainCount = new Set(
+      extractedSources
+        .map((s) => {
+          try {
+            const raw = s.originalUrl || s.uri || "";
+            if (!raw) return "";
+            return new URL(raw).hostname.replace(/^www\./, "");
+          } catch {
+            return "";
+          }
+        })
+        .filter(Boolean)
+    ).size;
+
+    const verifiedTitleCount = extractedSources.filter(
+      (s) => !!s.title && s.title.trim().length > 0
+    ).length;
+
+    const publishedAtCount = extractedSources.filter((s) => !!s.publishedAt).length;
+
+    const duplicateCheckedCount = extractedSources.filter(
+      (s) => s.duplicateStatus && s.duplicateStatus !== "not_checked"
+    ).length;
+
+    const isVerified =
+      groundingSourceCount > 0 &&
+      directOriginalUrlCount === groundingSourceCount &&
+      publishedAtCount === groundingSourceCount &&
+      duplicateCheckedCount === groundingSourceCount;
+
+    const isPartial =
+      groundingSourceCount > 0 &&
+      (directOriginalUrlCount > 0 || publishedAtCount > 0);
+
+    const isRedirectOnly =
+      groundingSourceCount > 0 && directOriginalUrlCount === 0;
+
+    let status: EvidenceStatus = "insufficient";
+    let label = "증거 부족";
+    let message =
+      "원문 URL, 발행일, 중복 판정이 모두 검증되지 않아 정량 점수/우선순위를 표시할 수 없습니다.";
+    let factCheckStatus: FactCheckStatus = "needs_source";
+
+    if (isVerified) {
+      status = "verified";
+      label = "원문 검증 완료";
+      message = "모든 수집 출처의 원문 URL, 발행일, 중복 판정이 확인되었습니다.";
+      factCheckStatus = "verified";
+    } else if (isPartial) {
+      status = "partial";
+      label = "부분 원문 검증";
+      message = "일부 출처의 원문 URL 또는 발행일이 미확인 상태입니다.";
+      factCheckStatus = "needs_date";
+    } else if (isRedirectOnly) {
+      status = "redirect_only";
+      label = "Grounding Redirect 전용";
+      message =
+        "원문 URL이 제공되지 않고 Google Grounding redirect URL만 확보되어 정량 점수가 차단되었습니다.";
+      factCheckStatus = "needs_source";
+    }
+
+    return {
+      status,
+      label,
+      message,
+      groundingSourceCount,
+      uniqueDomainCount,
+      directOriginalUrlCount,
+      verifiedTitleCount,
+      publishedAtCount,
+      duplicateCheckedCount,
+      factCheckStatus,
+      displayPolicy: {
+        showScores: status === "verified",
+        showMatrix: status === "verified",
+        showRanking: status === "verified",
+        reason:
+          status === "verified"
+            ? "모든 증거 상태가 검증되었습니다."
+            : "원문 URL·발행일·중복 판정 데이터가 완벽하지 않아 정량 지표 생성을 차단했습니다.",
+      },
+    };
   };
 
 
@@ -205,7 +268,8 @@ const App: React.FC = () => {
         dataSources, 
         keyword, 
         articleCount, 
-        image
+        image,
+        activePreset
       );
 
        console.log("RAW GEMINI RESPONSE", response);
@@ -266,21 +330,18 @@ console.log(
       // 5) source state는 response.sources 존재 여부와 상관없이 항상 저장
       setSources(normalizedSources);
 
-      const evidence = getEvidenceStatus(normalizedSources);
+      const summary = buildEvidenceSummary(normalizedSources);
+      setEvidenceSummary(summary);
 
       console.log("NORMALIZED SOURCES", normalizedSources);
-      console.log("EVIDENCE STATUS", evidence);
+      console.log("EVIDENCE SUMMARY", summary);
 
-      // source가 하나도 없으면 사용자에게 명확히 알림
-      if (evidence.status === "missing") {
+      if (summary.status === "insufficient") {
         showToast(
           "출처 메타데이터를 추출하지 못했습니다. 결과는 참고용 초안으로만 사용하세요.",
           "error"
         );
-      }
-
-      // redirect URL만 있으면 원문 검증 완료가 아니라는 점을 명시
-      if (evidence.status === "redirect_only") {
+      } else if (summary.status === "redirect_only") {
         showToast(
           "Google Grounding redirect 링크만 수집되었습니다. 직접 원문 URL 검증은 아직 완료되지 않았습니다.",
           "info"
@@ -294,18 +355,8 @@ console.log(
           `${selectedCategories.join(" ")} ${dataSources[0] || ""} 트렌드`,
           `${keyword || "기술 아티클"} 엔지니어링 블로그`,
         ],
-        factCheckStatus:
-          evidence.status === "grounded"
-            ? "verified"
-            : evidence.status === "redirect_only"
-              ? "needs_source"
-              : "not_evaluable",
-        crossValidationSourcesCount:
-          evidence.status === "grounded"
-            ? normalizedSources.filter(
-                (source) => source.sourceType === "original"
-              ).length
-            : 0,
+        factCheckStatus: summary.factCheckStatus,
+        crossValidationSourcesCount: summary.directOriginalUrlCount,
         dataVolumeEstKb: Math.floor(
           180 + (reportText?.length || 0) / 8
         ),
@@ -353,7 +404,7 @@ console.log(
 
               // source evidence 메타데이터
               sources: normalizedSources,
-              evidenceStatus: getEvidenceStatus(normalizedSources),
+              evidenceStatus: summary,
             })
           });
           
@@ -484,7 +535,7 @@ console.log(
 
           // source evidence 메타데이터
           sources,
-          evidenceStatus: getEvidenceStatus(sources),
+          evidenceStatus: buildEvidenceSummary(sources),
         })
       });
       
@@ -733,6 +784,8 @@ console.log(
               setArticleCount={setArticleCount}
               image={image}
               setImage={setImage}
+              activePresetId={activePreset.id}
+              onPresetChange={setActivePreset}
               isAnalyzing={isAnalyzing}
               onAnalyze={handleAnalyze}
             />
@@ -812,6 +865,8 @@ console.log(
                   report={report}
                   sources={sources}
                   factMetrics={factMetrics}
+                  evidenceSummary={evidenceSummary}
+                  selectedTemplate={activePreset}
                   notionUrl={notionUrl}
                   copyStatus={copyStatus}
                   isSavingToNotion={isSavingToNotion}

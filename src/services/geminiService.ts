@@ -1,3 +1,5 @@
+import { DevRelPreset } from "../constants";
+
 export const analyzeTrend = async (
   period: string,
   selectedCategories: string[],
@@ -6,7 +8,18 @@ export const analyzeTrend = async (
   dataSources: string[],
   keyword: string,
   articleCount: number,
-  imageBase64: string | null = null
+  imageBase64: string | null = null,
+  templatePolicy?: Pick<
+    DevRelPreset,
+    | "id"
+    | "title"
+    | "locale"
+    | "analysisMode"
+    | "allowedDomains"
+    | "blockedDomains"
+    | "requiredEvidence"
+    | "sourcePolicyNote"
+  >
 ) => {
   const res = await fetch('/api/analyze', {
     method: 'POST',
@@ -22,6 +35,7 @@ export const analyzeTrend = async (
       keyword,
       articleCount,
       imageBase64,
+      templatePolicy,
     }),
   });
 

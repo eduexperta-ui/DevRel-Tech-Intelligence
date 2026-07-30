@@ -8,12 +8,15 @@ import {
   ChevronDown, ArrowUpRight, Cpu, FileText, Info, Sliders, AlertCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Source, DashboardData, FactMetrics, EvidenceStatus, FactCheckStatus } from '../types';
+import { Source, DashboardData, FactMetrics, EvidenceStatus, FactCheckStatus, EvidenceSummary } from '../types';
+import { DevRelPreset } from '../constants';
 
 interface ReportResultProps {
   report: string;
   sources: Source[];
   factMetrics?: FactMetrics | null;
+  evidenceSummary?: EvidenceSummary | null;
+  selectedTemplate?: DevRelPreset;
   notionUrl: string | null;
   copyStatus: 'idle' | 'copied';
   isSavingToNotion: boolean;
@@ -25,25 +28,157 @@ interface ReportResultProps {
 }
 
 const evidenceLabel: Record<EvidenceStatus, string> = {
-  verified: "검증 완료",
-  partially_verified: "부분 확인",
+  verified: "원문 검증 완료",
+  partial: "부분 원문 검증",
+  partially_verified: "부분 원문 검증",
+  redirect_only: "Grounding Redirect 전용",
   unverified: "원문 미확보",
   duplicate: "중복 검토 필요",
-  insufficient: "판단 보류",
+  duplicate_review_needed: "중복 검토 필요",
+  insufficient: "증거 부족",
 };
 
 const factCheckLabel: Record<FactCheckStatus, string> = {
   verified: "원문 검증 완료",
   needs_source: "출처(URL) 확인 필요",
+  needs_title: "제목 확인 필요",
   needs_date: "발행일 확인 필요",
   needs_duplicate_check: "중복 판정 필요",
   not_evaluable: "평가 불가",
+};
+
+const formatReportMetadata = (text: string) => {
+  return text.replace(
+    /(- 분석 기간:[^\n]*)\s*(- 기술 카테고리:[^\n]*)\s*(- 타겟 오디언스:[^\n]*)\s*(- 분석 목적:[^\n]*)/g,
+    '$1\n$2\n$3\n$4'
+  );
+};
+
+const EvidenceStatusPanel: React.FC<{
+  evidenceSummary: EvidenceSummary | null;
+  selectedTemplate?: DevRelPreset;
+}> = ({ evidenceSummary, selectedTemplate }) => {
+  if (!evidenceSummary) return null;
+
+  const isVerified = evidenceSummary.status === "verified";
+  const isPartial = evidenceSummary.status === "partial" || evidenceSummary.status === "partially_verified";
+  const isRedirectOnly = evidenceSummary.status === "redirect_only";
+
+  return (
+    <section className="bg-white border-2 border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-100">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span
+              className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wide border ${
+                isVerified
+                  ? "bg-emerald-100 text-emerald-900 border-emerald-300"
+                  : isPartial
+                  ? "bg-amber-100 text-amber-900 border-amber-300"
+                  : "bg-slate-100 text-slate-800 border-slate-300"
+              }`}
+            >
+              근거 상태: {evidenceSummary.label}
+            </span>
+            <span className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1 rounded-full border border-slate-200">
+              팩트체크: {factCheckLabel[evidenceSummary.factCheckStatus] || "Needs Source"}
+            </span>
+            {selectedTemplate && (
+              <span className="text-xs font-bold text-indigo-700 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-200">
+                템플릿: {selectedTemplate.title}
+              </span>
+            )}
+          </div>
+          <h3 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight pt-1">
+            증거 기반 데이터 수집 &amp; 정성 품질 상태
+          </h3>
+        </div>
+      </div>
+
+      {/* Secured Data Status */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+          <span className="text-[10px] font-bold text-slate-500 uppercase">원문 URL</span>
+          <p className="text-xs font-extrabold text-slate-900">
+            {evidenceSummary.directOriginalUrlCount > 0
+              ? `✅ 확보됨 (${evidenceSummary.directOriginalUrlCount}건)`
+              : isRedirectOnly
+              ? "⚠️ Redirect만 존재"
+              : "❌ 미확보"}
+          </p>
+        </div>
+        <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+          <span className="text-[10px] font-bold text-slate-500 uppercase">원문 제목</span>
+          <p className="text-xs font-extrabold text-slate-900">
+            {evidenceSummary.verifiedTitleCount > 0
+              ? `✅ 확보됨 (${evidenceSummary.verifiedTitleCount}건)`
+              : "❌ 미확보"}
+          </p>
+        </div>
+        <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+          <span className="text-[10px] font-bold text-slate-500 uppercase">발행일 (PublishedAt)</span>
+          <p className="text-xs font-extrabold text-slate-900">
+            {evidenceSummary.publishedAtCount > 0
+              ? `✅ 확보됨 (${evidenceSummary.publishedAtCount}건)`
+              : "❌ 수동 확인 필요"}
+          </p>
+        </div>
+        <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+          <span className="text-[10px] font-bold text-slate-500 uppercase">중복 판정</span>
+          <p className="text-xs font-extrabold text-slate-900">
+            {evidenceSummary.duplicateCheckedCount > 0
+              ? `✅ 판정 완료 (${evidenceSummary.duplicateCheckedCount}건)`
+              : "❌ 미검토"}
+          </p>
+        </div>
+      </div>
+
+      {/* Message Note */}
+      <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-1.5">
+        <div className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+          <FileText className="w-4 h-4 text-indigo-600" />
+          <span>수집 근거 분석 메세지</span>
+        </div>
+        <p className="text-xs text-slate-600 leading-relaxed">
+          {evidenceSummary.message}
+        </p>
+      </div>
+
+      {/* Next Tasks & Display Policy Reason */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+        <div className="p-4 bg-indigo-50/60 border border-indigo-200/80 rounded-2xl space-y-1.5">
+          <span className="text-[11px] font-bold text-indigo-900 flex items-center gap-1">
+            <CheckCircle2 className="w-3.5 h-3.5 text-indigo-600" />
+            다음 추천 검증 작업
+          </span>
+          <ul className="text-xs text-indigo-950 space-y-1 list-disc pl-4 font-medium">
+            <li>직접 원문 URL 및 기사 작성일(publishedAt) 수동 확인</li>
+            <li>기존 보관 아티클과의 기술 소재 중복 비교</li>
+            <li>사내 엔지니어링 리드 1:1 교차 타당성 검토</li>
+          </ul>
+        </div>
+
+        <div className="p-4 bg-amber-50/60 border border-amber-200/80 rounded-2xl space-y-1.5">
+          <span className="text-[11px] font-bold text-amber-900 flex items-center gap-1">
+            <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
+            정량화 보류 사유 (Display Policy)
+          </span>
+          <p className="text-xs text-amber-950 leading-relaxed font-medium">
+            {evidenceSummary.displayPolicy?.reason ||
+              "원문 URL, 발행일, 중복 판정 데이터가 완벽하지 않아 정량 지표 생성을 차단했습니다."}
+          </p>
+        </div>
+      </div>
+    </section>
+  );
 };
 
 export const ReportResult: React.FC<ReportResultProps> = ({
   report,
   sources,
   factMetrics,
+  evidenceSummary = null,
+  selectedTemplate,
   notionUrl,
   copyStatus,
   isSavingToNotion,
@@ -84,6 +219,8 @@ export const ReportResult: React.FC<ReportResultProps> = ({
         console.error("Failed to parse JSON in report", e);
       }
     }
+
+    cleanReport = formatReportMetadata(cleanReport);
 
     return { cleanReport, dashboardData };
   }, [report]);
@@ -240,99 +377,8 @@ export const ReportResult: React.FC<ReportResultProps> = ({
       animate={{ opacity: 1, y: 0 }}
       className="space-y-12 pb-32 max-w-7xl mx-auto"
     >
-      {/* 1. Evidence Status & Qualitative Transparency Dashboard Header */}
-      <section className="bg-white border-2 border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-100">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wide border ${
-                currentEvidenceStatus === "verified"
-                  ? "bg-emerald-100 text-emerald-900 border-emerald-300"
-                  : currentEvidenceStatus === "partially_verified"
-                  ? "bg-amber-100 text-amber-900 border-amber-300"
-                  : "bg-red-100 text-red-900 border-red-300"
-              }`}>
-                근거 상태: {evidenceLabel[currentEvidenceStatus]}
-              </span>
-              <span className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1 rounded-full border border-slate-200">
-                팩트체크: {factCheckLabel[factCheckStatus]}
-              </span>
-            </div>
-            <h3 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight pt-1">
-              증거 기반 데이터 수집 &amp; 정성 품질 상태
-            </h3>
-          </div>
-        </div>
-
-        {/* Secured Data Status */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
-            <span className="text-[10px] font-bold text-slate-500 uppercase">원문 URL</span>
-            <p className="text-xs font-extrabold text-slate-900">
-              {hasOriginalSources ? `✅ 확보됨 (${originalSourceCount}건)` : hasOnlyRedirectSources ? "⚠️ Redirect만 존재" : "❌ 미확보"}
-            </p>
-          </div>
-          <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
-            <span className="text-[10px] font-bold text-slate-500 uppercase">원문 제목</span>
-            <p className="text-xs font-extrabold text-slate-900">
-              {effectiveSources.length > 0 ? `✅ 확보됨 (${effectiveSources.length}건)` : "❌ 미확보"}
-            </p>
-          </div>
-          <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
-            <span className="text-[10px] font-bold text-slate-500 uppercase">발행일 (PublishedAt)</span>
-            <p className="text-xs font-extrabold text-slate-900">
-              {effectiveSources.some(s => s.publishedAt) ? "✅ 확보됨" : "❌ 수동 확인 필요"}
-            </p>
-          </div>
-          <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
-            <span className="text-[10px] font-bold text-slate-500 uppercase">중복 판정</span>
-            <p className="text-xs font-extrabold text-slate-900">
-              {effectiveSources.some(s => s.duplicateStatus) ? "✅ 판정 완료" : "❌ 미검토"}
-            </p>
-          </div>
-        </div>
-
-        {/* Evidence Analysis Summary Note */}
-        <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-1.5">
-          <div className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-            <FileText className="w-4 h-4 text-indigo-600" />
-            <span>수집 근거 기반 분석 메모</span>
-          </div>
-          <p className="text-xs text-slate-600 leading-relaxed">
-            {hasOriginalSources
-              ? `직접 확인된 원문 링크 ${originalSourceCount}건과 수집 메타데이터 ${effectiveSources.length}건에 근거하여 작성되었습니다.`
-              : hasOnlyRedirectSources
-              ? "Google Search Grounding의 redirect 링크 메타데이터에 기반하고 있으며, 직접 원문 URL 접속 검증이 필요합니다."
-              : "생성 모델 요약 데이터 기반 초안이며, 원문 출처 링크 검증이 아직 완료되지 않았습니다."}
-          </p>
-        </div>
-
-        {/* Next Validation Tasks & Display Policy Reason */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
-          <div className="p-4 bg-indigo-50/60 border border-indigo-200/80 rounded-2xl space-y-1.5">
-            <span className="text-[11px] font-bold text-indigo-900 flex items-center gap-1">
-              <CheckCircle2 className="w-3.5 h-3.5 text-indigo-600" />
-              다음 추천 검증 작업
-            </span>
-            <ul className="text-xs text-indigo-950 space-y-1 list-disc pl-4 font-medium">
-              <li>직접 원문 URL 및 기사 작성일(publishedAt) 수동 확인</li>
-              <li>기존 보관 아티클과의 기술 소재 중복 비교</li>
-              <li>사내 엔지니어링 리드 1:1 교차 타당성 검토</li>
-            </ul>
-          </div>
-
-          <div className="p-4 bg-amber-50/60 border border-amber-200/80 rounded-2xl space-y-1.5">
-            <span className="text-[11px] font-bold text-amber-900 flex items-center gap-1">
-              <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
-              정량화 보류 사유 (Display Policy)
-            </span>
-            <p className="text-xs text-amber-950 leading-relaxed font-medium">
-              {dashboardData?.displayPolicy?.reason ||
-                "원문 URL, 발행일, 중복 판정 데이터가 완벽히 충족되지 않아 근거 없는 수치 오류를 방지하고자 정량 점수를 보류하고 정성 태그로 표시합니다."}
-            </p>
-          </div>
-        </div>
-      </section>
+      {/* Evidence Summary Status Panel */}
+      <EvidenceStatusPanel evidenceSummary={evidenceSummary} selectedTemplate={selectedTemplate} />
 
       {/* Header Actions Sticky Bar */}
       <div className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center sm:justify-between sticky top-24 z-[90] bg-white/95 backdrop-blur-md p-4 md:p-6 rounded-2xl border border-neutral-200 shadow-sm">
