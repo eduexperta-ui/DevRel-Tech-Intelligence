@@ -127,6 +127,13 @@ const App: React.FC = () => {
         articleCount, 
         image
       );
+
+       console.log("RAW GEMINI RESPONSE", response);
+console.log(
+  "GROUNDING CHUNKS",
+  response?.candidates?.[0]?.groundingMetadata?.groundingChunks
+);
+
       let reportText = response.text || '';
 
       const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
