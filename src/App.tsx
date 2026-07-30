@@ -294,12 +294,12 @@ console.log(
           `${selectedCategories.join(" ")} ${dataSources[0] || ""} 트렌드`,
           `${keyword || "기술 아티클"} 엔지니어링 블로그`,
         ],
-        factCheckConfidenceScore:
+        factCheckStatus:
           evidence.status === "grounded"
-            ? Math.min(90, 70 + normalizedSources.length * 5)
+            ? "verified"
             : evidence.status === "redirect_only"
-              ? 50
-              : 0,
+              ? "needs_source"
+              : "not_evaluable",
         crossValidationSourcesCount:
           evidence.status === "grounded"
             ? normalizedSources.filter(

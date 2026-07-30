@@ -13,10 +13,37 @@ export type AnalysisPurpose =
   | '기획전 테마 선정'
   | '카테고리 운영 전략';
 
+export type EvidenceStatus =
+  | "verified"          // 원문 URL + 발행일 + 본문 근거 확보
+  | "partially_verified" // 일부 원문 또는 메타데이터만 확보
+  | "unverified"        // 모델 언급은 있으나 원문 근거 미확보
+  | "duplicate"         // 기존 수집 건과 중복 가능성 높음
+  | "insufficient";     // 분석 판단 불가
+
+export type FactCheckStatus =
+  | "verified"
+  | "needs_source"
+  | "needs_date"
+  | "needs_duplicate_check"
+  | "not_evaluable";
+
+export interface EvidenceCoverage {
+  sourceUrl: boolean;
+  publishedAt: boolean;
+  sourceTitle: boolean;
+  duplicateCheck: string;
+}
+
+export interface DisplayPolicy {
+  showScores: boolean;
+  showMatrix: boolean;
+  reason: string;
+}
+
 export interface FactMetrics {
   totalSourcesCollected: number;
   searchQueriesExecuted: string[];
-  factCheckConfidenceScore: number;
+  factCheckStatus: FactCheckStatus;
   crossValidationSourcesCount: number;
   dataVolumeEstKb: number;
 }
@@ -35,6 +62,12 @@ export interface SourceItem {
 
   // UI에 보여줄 상태 라벨
   statusLabel?: "원문 링크" | "Grounding redirect";
+
+  // 2D 매트릭스 조건 판별용 메타데이터
+  url?: string;
+  publishedAt?: string;
+  duplicateStatus?: string;
+  evidenceQuotes?: string[];
 }
 
 /**
@@ -59,7 +92,8 @@ export interface TrendCluster {
   signals: TrendSignal[];
   keyItems: string[]; // 주요 기술 키워드/라이브러리/아키텍처
   keyColors: string[]; // 관련 패키지/툴/태그
-  score?: number;
+  evidenceStatus?: EvidenceStatus;
+  factCheckStatus?: FactCheckStatus;
 }
 
 /**
@@ -74,11 +108,29 @@ export interface MDActionItem {
 }
 
 /**
- * DevRel 액션 보드 데이터 구조
+ * 카테고리별 정성 태그
+ */
+export interface CategoryPriority {
+  category: string;
+  actionabilityTag?: string;
+  opportunityTag?: string;
+  priority: number;
+}
+
+/**
+ * DevRel 액션 보드 데이터 구조 (근거 중심, 정량 점수 제거)
  */
 export interface DashboardData {
+  evidenceStatus?: EvidenceStatus;
+  evidenceCoverage?: EvidenceCoverage;
+  mentionSignal?: string;
+  actionabilityTag?: string;
+  opportunityTag?: string;
+  factCheckStatus?: FactCheckStatus;
+  displayPolicy?: DisplayPolicy;
+
   topTrends: TrendCluster[];
-  categoryPriorities: { category: string; score: number; priority: number }[];
+  categoryPriorities: CategoryPriority[];
   ageInsights: { ageGroup: string; insight: string }[];
   promotionIdeas: MDActionItem[];
   thumbnailCopies: string[];

@@ -73,22 +73,49 @@ ${userTypedKeyword ? `> **특동 탐색 키워드:** ${userTypedKeyword}\n` : ''
 
 ---
 
+[증거 기반 출력 원칙]
+- score, confidence, mentionScore, utilityScore, gap 등 숫자 점수를 생성하지 마십시오.
+- factCheckConfidenceScore를 생성하지 마십시오.
+- 원문 URL, 원문 제목, 발행일, 중복 여부가 확인되지 않으면 "검증 완료" 또는 정량 우선순위를 주장하지 마십시오.
+- 근거 상태는 다음 값 중 하나로만 반환하십시오:
+  verified, partially_verified, unverified, duplicate, insufficient
+- 팩트체크 상태는 다음 값 중 하나로만 반환하십시오:
+  verified, needs_source, needs_date, needs_duplicate_check, not_evaluable
+- 근거가 부족하면 추론으로 채우지 말고 "판단 보류"로 표시하십시오.
+- 2D 매트릭스용 좌표, 점수, 순위는 생성하지 마십시오.
+- 점수화는 원문 URL, 발행일, 중복 판정 데이터가 모두 확보된 경우에만 별도 단계에서 수행할 수 있다고 명시하십시오.
+
 [JSON 출력 규칙]
 리포트 본문 뒤에 반드시 아래 형식의 JSON을 \`\`\`json 코드 블록으로 포함하라.
 
 {
   "dashboard_data": {
+    "evidenceStatus": "partially_verified",
+    "evidenceCoverage": {
+      "sourceUrl": false,
+      "publishedAt": false,
+      "sourceTitle": true,
+      "duplicateCheck": "not_checked"
+    },
+    "mentionSignal": "observed_in_model_output_only",
+    "actionabilityTag": "requires_manual_review",
+    "opportunityTag": "insufficient_evidence",
+    "factCheckStatus": "needs_source",
+    "displayPolicy": {
+      "showScores": false,
+      "showMatrix": false,
+      "reason": "원문 URL·발행일·중복 판정 데이터가 확보되지 않았습니다."
+    },
     "topTrends": [
       {
         "title": "기술 시그널/사례명",
         "summary": "핵심 기술 요약",
         "keyItems": ["핵심기술1", "라이브러리2"],
-        "keyColors": ["아키텍처/태그1"],
-        "score": 88
+        "keyColors": ["아키텍처/태그1"]
       }
     ],
     "categoryPriorities": [
-      { "category": "카테고리명", "score": 92, "priority": 1 }
+      { "category": "카테고리명", "actionabilityTag": "수동_검토_필요", "opportunityTag": "근거_부족", "priority": 1 }
     ],
     "ageInsights": [
       { "ageGroup": "주니어 개발자", "insight": "기술 학습 및 문서화 인사이트" }

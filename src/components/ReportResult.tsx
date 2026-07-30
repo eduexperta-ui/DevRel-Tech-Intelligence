@@ -5,10 +5,10 @@ import {
   Copy, Download, Check, ExternalLink, TrendingUp, Lightbulb, Table, 
   Target, Zap, ShoppingBag, Layout, MousePointer2, BarChart3, Layers,
   ShieldCheck, Globe, Search, CheckCircle2, Database, FileCheck, Sparkles,
-  ChevronDown, ChevronUp, ArrowUpRight, Cpu, FileText, Info, Filter, Sliders
+  ChevronDown, ArrowUpRight, Cpu, FileText, Info, Sliders, AlertCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Source, DashboardData, FactMetrics } from '../types';
+import { Source, DashboardData, FactMetrics, EvidenceStatus, FactCheckStatus } from '../types';
 
 interface ReportResultProps {
   report: string;
@@ -23,6 +23,22 @@ interface ReportResultProps {
   onDownload: () => void;
   onSaveToNotion: () => void;
 }
+
+const evidenceLabel: Record<EvidenceStatus, string> = {
+  verified: "검증 완료",
+  partially_verified: "부분 확인",
+  unverified: "원문 미확보",
+  duplicate: "중복 검토 필요",
+  insufficient: "판단 보류",
+};
+
+const factCheckLabel: Record<FactCheckStatus, string> = {
+  verified: "원문 검증 완료",
+  needs_source: "출처(URL) 확인 필요",
+  needs_date: "발행일 확인 필요",
+  needs_duplicate_check: "중복 판정 필요",
+  not_evaluable: "평가 불가",
+};
 
 export const ReportResult: React.FC<ReportResultProps> = ({
   report,
@@ -72,6 +88,39 @@ export const ReportResult: React.FC<ReportResultProps> = ({
     return { cleanReport, dashboardData };
   }, [report]);
 
+  const currentEvidenceStatus: EvidenceStatus =
+    dashboardData?.evidenceStatus ||
+    (hasOriginalSources
+      ? "verified"
+      : hasOnlyRedirectSources
+      ? "partially_verified"
+      : "unverified");
+
+  const factCheckStatus: FactCheckStatus =
+    dashboardData?.factCheckStatus ||
+    factMetrics?.factCheckStatus ||
+    (hasOriginalSources
+      ? "verified"
+      : hasOnlyRedirectSources
+      ? "needs_source"
+      : "not_evaluable");
+
+  const hasMatrixEvidence =
+    effectiveSources.length > 0 &&
+    effectiveSources.every((source) => {
+      return Boolean(
+        (source.url || source.uri) &&
+          source.publishedAt &&
+          source.title &&
+          source.duplicateStatus !== undefined
+      );
+    });
+
+  const shouldShowMatrix =
+    hasMatrixEvidence &&
+    effectiveSources.length >= 3 &&
+    currentEvidenceStatus === "verified";
+
   const parsedBytes = useMemo(() => {
     if (!report) return 128000;
     return new Blob([report]).size;
@@ -95,17 +144,18 @@ export const ReportResult: React.FC<ReportResultProps> = ({
     return dashboardData.topTrends.map((trend) => ({
       name: trend.title || trend.keyItems?.[0] || "제목 없음",
       sourcesCount: effectiveSources.length,
-
-      // 원문 URL이 없으면 confidence 수치를 만들지 않음
-      confidence: hasOriginalSources
-        ? Math.min(90, 65 + originalSourceCount * 5)
-        : 0,
+      factCheckStatus: (trend.factCheckStatus ||
+        (hasOriginalSources
+          ? "verified"
+          : hasOnlyRedirectSources
+          ? "needs_source"
+          : "not_evaluable")) as FactCheckStatus,
     }));
   }, [
     dashboardData,
     effectiveSources.length,
     hasOriginalSources,
-    originalSourceCount,
+    hasOnlyRedirectSources,
   ]);
 
   if (!dashboardData) {
@@ -188,42 +238,103 @@ export const ReportResult: React.FC<ReportResultProps> = ({
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="space-y-20 pb-32 max-w-7xl mx-auto"
+      className="space-y-12 pb-32 max-w-7xl mx-auto"
     >
-      {/* Evidence Status Banner */}
-      <section
-        className={`rounded-2xl border p-5 ${
-          hasOriginalSources
-            ? "border-emerald-200 bg-emerald-50 text-emerald-950"
-            : hasOnlyRedirectSources
-              ? "border-amber-200 bg-amber-50 text-amber-950"
-              : "border-red-200 bg-red-50 text-red-950"
-        }`}
-      >
-        <div className="flex items-start gap-3">
-          <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" />
+      {/* 1. Evidence Status & Qualitative Transparency Dashboard Header */}
+      <section className="bg-white border-2 border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-100">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wide border ${
+                currentEvidenceStatus === "verified"
+                  ? "bg-emerald-100 text-emerald-900 border-emerald-300"
+                  : currentEvidenceStatus === "partially_verified"
+                  ? "bg-amber-100 text-amber-900 border-amber-300"
+                  : "bg-red-100 text-red-900 border-red-300"
+              }`}>
+                근거 상태: {evidenceLabel[currentEvidenceStatus]}
+              </span>
+              <span className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1 rounded-full border border-slate-200">
+                팩트체크: {factCheckLabel[factCheckStatus]}
+              </span>
+            </div>
+            <h3 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight pt-1">
+              증거 기반 데이터 수집 &amp; 정성 품질 상태
+            </h3>
+          </div>
+        </div>
 
-          <div>
-            <p className="text-sm font-bold">
-              {hasOriginalSources
-                ? "Evidence status: 원문 링크 포함"
-                : hasOnlyRedirectSources
-                  ? "Evidence status: Grounding redirect만 수집됨"
-                  : "Evidence status: 출처 메타데이터 없음"}
+        {/* Secured Data Status */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+            <span className="text-[10px] font-bold text-slate-500 uppercase">원문 URL</span>
+            <p className="text-xs font-extrabold text-slate-900">
+              {hasOriginalSources ? `✅ 확보됨 (${originalSourceCount}건)` : hasOnlyRedirectSources ? "⚠️ Redirect만 존재" : "❌ 미확보"}
             </p>
+          </div>
+          <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+            <span className="text-[10px] font-bold text-slate-500 uppercase">원문 제목</span>
+            <p className="text-xs font-extrabold text-slate-900">
+              {effectiveSources.length > 0 ? `✅ 확보됨 (${effectiveSources.length}건)` : "❌ 미확보"}
+            </p>
+          </div>
+          <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+            <span className="text-[10px] font-bold text-slate-500 uppercase">발행일 (PublishedAt)</span>
+            <p className="text-xs font-extrabold text-slate-900">
+              {effectiveSources.some(s => s.publishedAt) ? "✅ 확보됨" : "❌ 수동 확인 필요"}
+            </p>
+          </div>
+          <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+            <span className="text-[10px] font-bold text-slate-500 uppercase">중복 판정</span>
+            <p className="text-xs font-extrabold text-slate-900">
+              {effectiveSources.some(s => s.duplicateStatus) ? "✅ 판정 완료" : "❌ 미검토"}
+            </p>
+          </div>
+        </div>
 
-            <p className="mt-1 text-xs leading-relaxed opacity-90">
-              {hasOriginalSources
-                ? `직접 원문 링크 ${originalSourceCount}건과 전체 source 메타데이터 ${effectiveSources.length}건을 수집했습니다.`
-                : hasOnlyRedirectSources
-                  ? "현재 링크는 Google Search Grounding이 제공한 redirect 메타데이터입니다. 원문 URL을 직접 확인한 상태는 아닙니다."
-                  : "분석 본문은 생성되었지만, 검색 기반 source 메타데이터를 추출하지 못했습니다. 결과는 참고용 초안으로만 사용하세요."}
+        {/* Evidence Analysis Summary Note */}
+        <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-1.5">
+          <div className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+            <FileText className="w-4 h-4 text-indigo-600" />
+            <span>수집 근거 기반 분석 메모</span>
+          </div>
+          <p className="text-xs text-slate-600 leading-relaxed">
+            {hasOriginalSources
+              ? `직접 확인된 원문 링크 ${originalSourceCount}건과 수집 메타데이터 ${effectiveSources.length}건에 근거하여 작성되었습니다.`
+              : hasOnlyRedirectSources
+              ? "Google Search Grounding의 redirect 링크 메타데이터에 기반하고 있으며, 직접 원문 URL 접속 검증이 필요합니다."
+              : "생성 모델 요약 데이터 기반 초안이며, 원문 출처 링크 검증이 아직 완료되지 않았습니다."}
+          </p>
+        </div>
+
+        {/* Next Validation Tasks & Display Policy Reason */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+          <div className="p-4 bg-indigo-50/60 border border-indigo-200/80 rounded-2xl space-y-1.5">
+            <span className="text-[11px] font-bold text-indigo-900 flex items-center gap-1">
+              <CheckCircle2 className="w-3.5 h-3.5 text-indigo-600" />
+              다음 추천 검증 작업
+            </span>
+            <ul className="text-xs text-indigo-950 space-y-1 list-disc pl-4 font-medium">
+              <li>직접 원문 URL 및 기사 작성일(publishedAt) 수동 확인</li>
+              <li>기존 보관 아티클과의 기술 소재 중복 비교</li>
+              <li>사내 엔지니어링 리드 1:1 교차 타당성 검토</li>
+            </ul>
+          </div>
+
+          <div className="p-4 bg-amber-50/60 border border-amber-200/80 rounded-2xl space-y-1.5">
+            <span className="text-[11px] font-bold text-amber-900 flex items-center gap-1">
+              <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
+              정량화 보류 사유 (Display Policy)
+            </span>
+            <p className="text-xs text-amber-950 leading-relaxed font-medium">
+              {dashboardData?.displayPolicy?.reason ||
+                "원문 URL, 발행일, 중복 판정 데이터가 완벽히 충족되지 않아 근거 없는 수치 오류를 방지하고자 정량 점수를 보류하고 정성 태그로 표시합니다."}
             </p>
           </div>
         </div>
       </section>
 
-      {/* Header Actions */}
+      {/* Header Actions Sticky Bar */}
       <div className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center sm:justify-between sticky top-24 z-[90] bg-white/95 backdrop-blur-md p-4 md:p-6 rounded-2xl border border-neutral-200 shadow-sm">
         <h2 className="text-xl md:text-2xl font-bold tracking-tight text-neutral-900 flex items-center gap-3">
           <div className="w-1.5 h-6 bg-neutral-900 rounded-full" />
@@ -268,9 +379,8 @@ export const ReportResult: React.FC<ReportResultProps> = ({
         </div>
       </div>
 
-      {/* Data Collection & Fact-Checking Transparency Dashboard */}
+      {/* Data Collection & Fact-Checking Transparency Accordions */}
       <section className="bg-white border-2 border-slate-200 text-slate-900 rounded-3xl p-6 md:p-8 shadow-sm transition-all space-y-6">
-        {/* Real-time Collection Metadata Bar */}
         <div className="bg-slate-900 text-white rounded-2xl p-4 md:p-5 flex flex-wrap items-center justify-between gap-4 border border-slate-800">
           <div className="flex items-center gap-3 flex-wrap">
             <div className="flex items-center gap-2 bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 px-3 py-1 rounded-lg text-xs font-bold">
@@ -292,9 +402,6 @@ export const ReportResult: React.FC<ReportResultProps> = ({
               <span>Google Search Grounding 실시간 매칭</span>
             </div>
           </div>
-          <span className="text-[11px] text-slate-400 font-medium">
-            * Google Search Grounding 기반 참고 링크와 출처 메타데이터 목록입니다.
-          </span>
         </div>
 
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-100">
@@ -303,17 +410,8 @@ export const ReportResult: React.FC<ReportResultProps> = ({
               <ShieldCheck className="w-4 h-4 text-emerald-600" />
               <span>구글 서치 그라운딩 &amp; 출처 메타데이터 대시보드</span>
             </div>
-            <h3 className="text-xl md:text-2xl font-black tracking-tight text-slate-900">데이터 수집 및 출처 메타데이터 상태</h3>
-            <p className="text-xs md:text-sm text-slate-600 font-medium">
-              출처 기반 분석 상태를 표시합니다. 각 카드를 클릭하면 Google Search Grounding 기반 참고 링크와 세부 메타데이터 내역이 카드 아래에 표시됩니다.
-            </p>
+            <h3 className="text-xl md:text-2xl font-black tracking-tight text-slate-900">데이터 수집 및 출처 메타데이터 세부</h3>
           </div>
-          {sources.length > 0 && (
-            <div className="flex items-center gap-2 bg-slate-50 px-4 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 shrink-0">
-              <Sparkles className="w-4 h-4 text-amber-500" />
-              <span>{effectiveSources.length}개 Google Grounding Source Metadata 매핑</span>
-            </div>
-          )}
         </div>
 
         {/* 4 Clickable Accordion Metric Cards */}
@@ -349,7 +447,6 @@ export const ReportResult: React.FC<ReportResultProps> = ({
               </div>
             </button>
 
-            {/* Inline Accordion Detail Content for Card 1 */}
             <AnimatePresence>
               {selectedMetric === 'sources' && (
                 <motion.div
@@ -444,7 +541,6 @@ export const ReportResult: React.FC<ReportResultProps> = ({
               </div>
             </button>
 
-            {/* Inline Accordion Detail Content for Card 2 */}
             <AnimatePresence>
               {selectedMetric === 'factcheck' && (
                 <motion.div
@@ -459,9 +555,6 @@ export const ReportResult: React.FC<ReportResultProps> = ({
                       <ShieldCheck className="w-4 h-4 text-emerald-600" />
                       수집된 출처 기반 주요 분석 주제
                     </span>
-                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded">
-                      Grounding 매칭
-                    </span>
                   </div>
 
                   <div className="space-y-1.5">
@@ -475,11 +568,9 @@ export const ReportResult: React.FC<ReportResultProps> = ({
                           <span className="text-[10px] text-neutral-500 bg-neutral-100 px-2 py-0.5 rounded font-mono">
                             {topic.sourcesCount}개 소스
                           </span>
-                          {topic.confidence > 0 && (
-                            <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded">
-                              {topic.confidence}%
-                            </span>
-                          )}
+                          <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                            {factCheckLabel[topic.factCheckStatus]}
+                          </span>
                         </div>
                       </div>
                     ))}
@@ -519,7 +610,6 @@ export const ReportResult: React.FC<ReportResultProps> = ({
               </div>
             </button>
 
-            {/* Inline Accordion Detail Content for Card 3 */}
             <AnimatePresence>
               {selectedMetric === 'volume' && (
                 <motion.div
@@ -567,7 +657,7 @@ export const ReportResult: React.FC<ReportResultProps> = ({
                   <span>실시간 서치 쿼리</span>
                 </div>
                 <div className="text-2xl font-bold text-neutral-900">
-                  {factMetrics?.searchQueriesExecuted?.length || 4} <span className="text-sm font-semibold text-neutral-500">개 매핑</span>
+                  {factMetrics?.searchQueriesExecuted?.length || 2} <span className="text-sm font-semibold text-neutral-500">개 매핑</span>
                 </div>
                 <p className="text-xs text-neutral-500 font-medium">
                   구글 검색 엔진을 통해 실시간 탐색된 검색 키워드
@@ -580,7 +670,6 @@ export const ReportResult: React.FC<ReportResultProps> = ({
               </div>
             </button>
 
-            {/* Inline Accordion Detail Content for Card 4 */}
             <AnimatePresence>
               {selectedMetric === 'queries' && (
                 <motion.div
@@ -600,16 +689,7 @@ export const ReportResult: React.FC<ReportResultProps> = ({
                       </div>
                     ))
                   ) : (
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between p-2.5 bg-white rounded-lg border border-neutral-200 font-mono">
-                        <span className="text-neutral-800 font-medium">"네카라쿠배당토 최신 기술 아티클 엔지니어링 블로그"</span>
-                        <span className="text-[10px] text-emerald-700 font-sans font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 shrink-0">완료</span>
-                      </div>
-                      <div className="flex items-center justify-between p-2.5 bg-white rounded-lg border border-neutral-200 font-mono">
-                        <span className="text-neutral-800 font-medium">"2026 IT 테크 트렌드 백엔드 프론트엔드 인프라 사례"</span>
-                        <span className="text-[10px] text-emerald-700 font-sans font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 shrink-0">완료</span>
-                      </div>
-                    </div>
+                    <div className="p-2 bg-white rounded text-neutral-500">수집 쿼리 정보가 없습니다.</div>
                   )}
                 </motion.div>
               )}
@@ -628,7 +708,7 @@ export const ReportResult: React.FC<ReportResultProps> = ({
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
           {dashboardData.topTrends.map((trend, i) => {
-            const score = trend.score || 80;
+            const statusText = evidenceLabel[trend.evidenceStatus || currentEvidenceStatus] || "부분 확인";
 
             return (
               <motion.div 
@@ -639,10 +719,9 @@ export const ReportResult: React.FC<ReportResultProps> = ({
                 <div>
                   <div className="flex justify-between items-center mb-5">
                     <span className="text-[11px] font-black bg-neutral-100 text-neutral-600 px-3 py-1.5 rounded-lg uppercase tracking-widest">Signal 0{i+1}</span>
-                    <div className="flex items-baseline gap-0.5 text-neutral-900">
-                      <span className="text-xl font-black tracking-tighter">{score}</span>
-                      <span className="text-[10px] font-bold text-neutral-400">/100</span>
-                    </div>
+                    <span className="text-xs font-bold px-2 py-1 rounded bg-amber-50 text-amber-900 border border-amber-200">
+                      {statusText}
+                    </span>
                   </div>
                   <h4 className="font-bold text-neutral-900 text-lg mb-3 leading-snug break-keep">{trend.title}</h4>
                   <p className="text-sm text-neutral-600 mb-6 leading-relaxed bg-neutral-50 p-4 rounded-xl break-keep">{trend.summary}</p>
@@ -667,14 +746,13 @@ export const ReportResult: React.FC<ReportResultProps> = ({
         </div>
       </section>
 
-      {/* 2. Priority Chart Section: Horizontal Bar Chart & 2D Matrix Toggle */}
+      {/* 2. Priority Section: Qualitative Status Tag View & Conditional 2D Matrix */}
       <section className="bg-white border-2 border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm space-y-6">
-        {/* Clean Header & View Mode Selector */}
         <div className="space-y-4 pb-5 border-b border-slate-100">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full text-xs font-bold">
               <BarChart3 className="w-4 h-4 text-indigo-600" />
-              <span>우선순위 분석 차트</span>
+              <span>우선순위 정성 정밀 분석</span>
             </div>
 
             {/* View Mode Switcher */}
@@ -688,7 +766,7 @@ export const ReportResult: React.FC<ReportResultProps> = ({
                 }`}
               >
                 <Sliders className="w-3.5 h-3.5" />
-                <span>비교 수평 막대 차트 (추천)</span>
+                <span>정성 분류 태그 카드 (추천)</span>
               </button>
               <button
                 onClick={() => setChartViewMode('matrix')}
@@ -706,245 +784,97 @@ export const ReportResult: React.FC<ReportResultProps> = ({
 
           <h3 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">
             {chartViewMode === 'bar' 
-              ? '기술 스택별 언급도 vs 실무 활용성 정량 비교' 
-              : '기술 분야별 개발자 언급도 & 실무 활용성 2D 매트릭스'}
+              ? '기술 스택별 정성 상태 및 실행/기회 태그 매핑' 
+              : '기술 분야별 2D 매트릭스'}
           </h3>
-          
-          {/* Axis Definitions directly below title */}
-          <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 space-y-1">
-            <p className="leading-relaxed">
-              <strong className="text-indigo-900 font-bold">X축 / 언급도 (Developer Focus):</strong> 기술 블로그, 밋업, 엔지니어링 커뮤니티 언급 빈도
-            </p>
-            <p className="leading-relaxed">
-              <strong className="text-indigo-900 font-bold">Y축 / 실무 활용성 (Practical Utility):</strong> 서비스 안정성, 대용량 트래픽 대응, 아키텍처 실무 적용 가치
-            </p>
-          </div>
         </div>
 
-        {/* View Mode 1: Horizontal Bar Chart (대안 B - 추천) */}
         {chartViewMode === 'bar' ? (
-          <div className="space-y-6">
-            {/* Legend & Guidance */}
-            <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-900 text-white p-4 rounded-2xl border border-slate-800 text-xs">
-              <div className="flex items-center gap-4 flex-wrap font-bold">
-                <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded bg-indigo-500" />
-                  <span>개발자 언급도 (버즈량)</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded bg-emerald-400" />
-                  <span>실무 활용성 (서비스/인프라 기여 가치)</span>
-                </div>
-              </div>
-              <span className="text-[11px] text-slate-400">
-                * 두 지표 간 갭(Gap)을 기반으로 실속형 실무 기술과 트렌디 탐색 기술을 정밀 구분합니다.
-              </span>
-            </div>
-
-            {/* Horizontal Bars List */}
-            <div className="space-y-5">
-              {dashboardData.categoryPriorities.map((cat, idx) => {
-                const mentionScore = Math.min(98, Math.max(70, cat.score - (idx % 2 === 0 ? 3 : -2)));
-                const utilityScore = Math.min(99, Math.max(75, cat.score + (idx % 2 === 0 ? 2 : -3)));
-                const gap = utilityScore - mentionScore;
-
-                return (
-                  <div key={idx} className="bg-slate-50 border border-slate-200 rounded-2xl p-4 md:p-5 hover:border-slate-300 transition-all space-y-3">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                      <div className="flex items-center gap-2.5">
-                        <span className="w-6 h-6 rounded-lg bg-indigo-600 text-white font-mono text-xs font-bold flex items-center justify-center">
-                          0{cat.priority}
-                        </span>
-                        <h4 className="font-extrabold text-slate-900 text-sm md:text-base">
-                          {cat.category}
-                        </h4>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {gap > 0 ? (
-                          <span className="text-[11px] font-bold px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-full border border-emerald-200">
-                            💡 실비중 우수 (실무가치 +{gap}p)
-                          </span>
-                        ) : gap < 0 ? (
-                          <span className="text-[11px] font-bold px-2.5 py-1 bg-amber-100 text-amber-800 rounded-full border border-amber-200">
-                            🔥 트렌디 탐색 (언급도 +{Math.abs(gap)}p)
-                          </span>
-                        ) : (
-                          <span className="text-[11px] font-bold px-2.5 py-1 bg-indigo-100 text-indigo-800 rounded-full border border-indigo-200">
-                            ⚡ 균형 스택 (언급/실무 균형)
-                          </span>
-                        )}
-                        <span className="font-mono font-black text-sm text-slate-900 bg-white px-3 py-1 rounded-lg border border-slate-200">
-                          종합 {cat.score}점
-                        </span>
-                      </div>
+          <div className="space-y-4">
+            <div className="space-y-4">
+              {dashboardData.categoryPriorities.map((cat, idx) => (
+                <div key={idx} className="bg-slate-50 border border-slate-200 rounded-2xl p-4 md:p-5 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <span className="w-6 h-6 rounded-lg bg-indigo-600 text-white font-mono text-xs font-bold flex items-center justify-center">
+                        0{cat.priority}
+                      </span>
+                      <h4 className="font-extrabold text-slate-900 text-sm md:text-base">
+                        {cat.category}
+                      </h4>
                     </div>
-
-                    {/* Dual Horizontal Progress Bars */}
-                    <div className="space-y-2 pt-1">
-                      {/* 1. Mention Score Bar */}
-                      <div className="space-y-1">
-                        <div className="flex justify-between text-[11px] font-bold text-slate-600">
-                          <span>개발자 언급도</span>
-                          <span className="font-mono text-indigo-700">{mentionScore}점</span>
-                        </div>
-                        <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
-                          <motion.div
-                            initial={{ width: 0 }}
-                            animate={{ width: `${mentionScore}%` }}
-                            transition={{ duration: 0.8, delay: idx * 0.1 }}
-                            className="bg-indigo-600 h-full rounded-full"
-                          />
-                        </div>
-                      </div>
-
-                      {/* 2. Utility Score Bar */}
-                      <div className="space-y-1">
-                        <div className="flex justify-between text-[11px] font-bold text-slate-600">
-                          <span>실무 활용성 (서비스/인프라 기여 가치)</span>
-                          <span className="font-mono text-emerald-700">{utilityScore}점</span>
-                        </div>
-                        <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
-                          <motion.div
-                            initial={{ width: 0 }}
-                            animate={{ width: `${utilityScore}%` }}
-                            transition={{ duration: 0.8, delay: idx * 0.1 + 0.15 }}
-                            className="bg-emerald-500 h-full rounded-full"
-                          />
-                        </div>
-                      </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-xs font-bold px-3 py-1 bg-indigo-100 text-indigo-900 rounded-lg border border-indigo-200">
+                        실행 태그: {cat.actionabilityTag || "수동 검토 필요"}
+                      </span>
+                      <span className="text-xs font-bold px-3 py-1 bg-slate-200 text-slate-800 rounded-lg border border-slate-300">
+                        기회 태그: {cat.opportunityTag || "근거 보류"}
+                      </span>
                     </div>
                   </div>
-                );
-              })}
+                </div>
+              ))}
             </div>
           </div>
         ) : (
-          /* View Mode 2: 2D Quadrant Matrix */
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
-            {/* Visual Canvas Quadrant */}
-            <div className="lg:col-span-8 bg-slate-900 rounded-2xl p-6 md:p-8 text-white relative min-h-[400px] md:min-h-[460px] flex flex-col justify-between overflow-hidden shadow-inner">
-              {/* Background Axis Lines */}
-              <div className="absolute inset-x-8 top-1/2 h-0.5 bg-slate-800/80 border-t border-dashed border-slate-700" />
-              <div className="absolute inset-y-8 left-1/2 w-0.5 bg-slate-800/80 border-l border-dashed border-slate-700" />
+          /* 2D Matrix Mode: Render matrix ONLY when shouldShowMatrix is true */
+          shouldShowMatrix ? (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
+              <div className="lg:col-span-8 bg-slate-900 rounded-2xl p-6 md:p-8 text-white relative min-h-[400px] flex flex-col justify-between overflow-hidden shadow-inner">
+                <div className="absolute inset-x-8 top-1/2 h-0.5 bg-slate-800/80 border-t border-dashed border-slate-700" />
+                <div className="absolute inset-y-8 left-1/2 w-0.5 bg-slate-800/80 border-l border-dashed border-slate-700" />
 
-              {/* Quadrant Area Badges (사분면 모서리 워터마크) */}
-              <div className="absolute top-8 left-4 text-[11px] font-bold text-emerald-400/90 bg-slate-800/80 px-2.5 py-1 rounded-lg border border-slate-700/60 pointer-events-none z-0">
-                Q2: 실무 가치 중심 (High Utility)
-              </div>
-
-              <div className="absolute top-8 right-4 text-[11px] font-bold text-amber-300 bg-amber-500/20 px-2.5 py-1 rounded-lg border border-amber-400/30 pointer-events-none z-0">
-                Q1: 핵심 우선 검토 (Core Focus) ⭐
-              </div>
-
-              <div className="absolute bottom-10 left-4 text-[11px] font-bold text-slate-400/90 bg-slate-800/80 px-2.5 py-1 rounded-lg border border-slate-700/60 pointer-events-none z-0">
-                Q4: 트래킹 관심 대상 (Watchlist)
-              </div>
-
-              <div className="absolute bottom-10 right-4 text-[11px] font-bold text-sky-300/90 bg-slate-800/80 px-2.5 py-1 rounded-lg border border-slate-700/60 pointer-events-none z-0">
-                Q3: 라이징 기술 주제 (Rising Topics)
-              </div>
-
-              {/* Y Axis Title (Top Center over Y-axis line) */}
-              <div className="absolute top-3 left-1/2 -translate-x-1/2 text-xs font-extrabold text-indigo-300 bg-slate-950/80 px-3 py-1 rounded-full border border-indigo-500/30 flex items-center gap-1 z-10 shadow-sm">
-                <span>▲ Y축: 실무 활용성</span>
-              </div>
-
-              {/* Quadrant Nodes Canvas */}
-              <div className="relative w-full h-full my-10 min-h-[280px]">
-                {dashboardData.categoryPriorities.map((cat, idx) => {
-                  let xPct = 72;
-                  let yPct = 82;
-
-                  if (idx === 0) {
-                    xPct = 68;
-                  } else if (idx === 1) {
-                    xPct = 84;
-                  } else {
-                    xPct = Math.min(85, Math.max(18, (cat.score + (idx % 2 === 0 ? 10 : -15))));
-                    yPct = Math.min(85, Math.max(18, (90 - idx * 22)));
-                  }
-
-                  const isTop = cat.priority <= 2;
-
-                  return (
+                <div className="relative w-full h-full my-10 min-h-[280px]">
+                  {dashboardData.categoryPriorities.map((cat, idx) => (
                     <motion.div
                       key={idx}
                       initial={{ scale: 0 }}
                       animate={{ scale: 1 }}
                       transition={{ delay: idx * 0.1, type: 'spring' }}
-                      style={{ left: `${xPct}%`, top: `${100 - yPct}%` }}
+                      style={{ left: `${25 + idx * 25}%`, top: `${30 + idx * 20}%` }}
                       className="absolute -translate-x-1/2 -translate-y-1/2 group z-20 cursor-pointer"
                     >
-                      <div className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border font-bold text-xs shadow-xl transition-all duration-300 group-hover:scale-110 ${
-                        isTop 
-                          ? 'bg-amber-400 text-slate-950 border-amber-300 ring-4 ring-amber-400/25' 
-                          : 'bg-slate-800 text-slate-100 border-slate-600 group-hover:border-indigo-400'
-                      }`}>
+                      <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-amber-400 text-slate-950 font-bold text-xs border border-amber-300 shadow-xl">
                         <span className="w-2 h-2 rounded-full bg-current animate-pulse" />
                         <span className="whitespace-nowrap">{cat.category}</span>
-                        <span className="text-[10px] opacity-90 font-mono font-black">({cat.score}p)</span>
                       </div>
                     </motion.div>
-                  );
-                })}
-              </div>
-
-              {/* X Axis Title (Bottom Left) */}
-              <div className="w-full text-left pt-2.5 border-t border-slate-800 text-xs font-extrabold text-indigo-300 flex items-center justify-start pl-2">
-                <span>▶ X축: 개발자 언급도</span>
-              </div>
-            </div>
-
-            {/* Quadrant Legend & Ranking */}
-            <div className="lg:col-span-4 flex flex-col justify-between space-y-4">
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-3">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                  <Target className="w-4 h-4 text-slate-700" />
-                  <span>우선순위 랭킹 정량 결과</span>
-                </h4>
-                <div className="space-y-2">
-                  {dashboardData.categoryPriorities.map((cat, i) => (
-                    <div key={i} className="p-3 bg-white border border-slate-200 rounded-xl flex items-center justify-between text-xs hover:border-slate-400 transition-colors">
-                      <div className="flex items-center gap-2.5">
-                        <span className={`w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] font-mono ${
-                          i === 0 ? 'bg-amber-400 text-slate-950' : 'bg-slate-100 text-slate-700'
-                        }`}>
-                          0{cat.priority}
-                        </span>
-                        <span className="font-bold text-slate-900">{cat.category}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-bold text-slate-700">{cat.score}점</span>
-                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                          cat.score > 80 ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'
-                        }`}>
-                          {cat.score > 80 ? 'Q1 필수' : 'Q2/Q3'}
-                        </span>
-                      </div>
-                    </div>
                   ))}
                 </div>
               </div>
-
-              {/* Audience Insight Card */}
-              <div className="bg-slate-900 text-white p-5 rounded-2xl space-y-2.5 border border-slate-800">
-                <div className="text-[11px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                  <Target className="w-3.5 h-3.5 text-amber-400" />
-                  <span>타겟 오디언스 핵심 인사이트</span>
+            </div>
+          ) : (
+            /* Matrix Disabled Notice */
+            <div className="bg-slate-50 border-2 border-slate-200 rounded-3xl p-6 md:p-8 space-y-4">
+              <div className="flex items-center gap-2.5 text-amber-800 font-bold text-lg">
+                <AlertCircle className="w-5 h-5 text-amber-600" />
+                <h3>정량 매트릭스 표시 보류</h3>
+              </div>
+              <p className="text-sm text-slate-700 leading-relaxed">
+                원문 URL, 발행일, 중복 판정 데이터가 충분히 확보되기 전까지 객관성 유지를 위해 우선순위 점수와 2D 매트릭스는 기본 비활성화 처리됩니다.
+              </p>
+              <div className="p-4 bg-white rounded-2xl border border-slate-200 space-y-2 text-xs text-slate-600">
+                <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                  <Info className="w-4 h-4 text-indigo-600" />
+                  <span>매트릭스 표시 최소 충족 조건</span>
                 </div>
-                {dashboardData.ageInsights.slice(0, 2).map((insight, i) => (
-                  <div key={i} className="text-xs leading-relaxed text-slate-300 border-l-2 border-amber-400 pl-2.5 my-1.5">
-                    <span className="font-bold text-white uppercase">{insight.ageGroup}: </span>
-                    <span>{insight.insight}</span>
-                  </div>
-                ))}
+                <ul className="list-disc pl-5 space-y-1">
+                  <li>원문 URL (uri/url): {hasOriginalSources ? "✅ 확보됨" : "❌ 미확보 (Grounding redirect만 존재)"}</li>
+                  <li>원문 제목 (title): {effectiveSources.length > 0 ? "✅ 확보됨" : "❌ 미확보"}</li>
+                  <li>발행일 (publishedAt): ❌ 미확보</li>
+                  <li>중복 판정 (duplicateStatus): ❌ 검토 필요</li>
+                  <li>최소 근거 수: {effectiveSources.length >= 3 ? "✅ 3건 이상" : `❌ ${effectiveSources.length}/3건`}</li>
+                </ul>
+                <p className="pt-1 text-[11px] text-slate-500 italic">
+                  * 점수가 낮아서 숨기는 것이 아니라, 객관적 수치를 산출할 수 있는 최소 데이터 조건(원문 URL·발행일·중복 검토)이 충족되지 않아 투명성을 위해 보류 상태로 전환되었습니다.
+                </p>
               </div>
             </div>
-          </div>
+          )
         )}
       </section>
 
-      {/* 3. Integrated Action Plan (통합 기획 실행 패키지) */}
+      {/* 3. Integrated Action Plan */}
       <section className="space-y-6">
         <div className="flex items-center gap-3 pb-4 border-b border-neutral-200">
           <div className="w-10 h-10 rounded-full bg-neutral-900 text-white flex items-center justify-center font-bold">
@@ -952,7 +882,7 @@ export const ReportResult: React.FC<ReportResultProps> = ({
           </div>
           <div>
             <h3 className="text-xl font-bold text-neutral-900 tracking-tight">테크블로그 &amp; 교육 세션 종합 실행 패키지</h3>
-            <p className="text-xs text-neutral-500">기획 목적, 추천 헤드라인, 지식 자산화 전략이 한눈에 파악되도록 1:1 세트로 통합된 기획안입니다.</p>
+            <p className="text-xs text-neutral-500">기획 목적, 추천 헤드라인, 지식 자산화 전략이 한눈에 파악되도록 통합된 기획안입니다.</p>
           </div>
         </div>
 
@@ -964,7 +894,6 @@ export const ReportResult: React.FC<ReportResultProps> = ({
             return (
               <div key={i} className="bg-white border-2 border-neutral-200 hover:border-neutral-900 rounded-2xl p-6 shadow-sm transition-all flex flex-col justify-between space-y-5">
                 <div className="space-y-4">
-                  {/* Category Header */}
                   <div className="flex items-center justify-between pb-3 border-b border-neutral-100">
                     <span className="text-[11px] font-black bg-neutral-900 text-white px-2.5 py-1 rounded-md uppercase tracking-wider">
                       기획안 0{i + 1}
@@ -974,7 +903,6 @@ export const ReportResult: React.FC<ReportResultProps> = ({
                     </span>
                   </div>
 
-                  {/* Core Plan */}
                   <div className="space-y-1.5">
                     <h4 className="font-bold text-neutral-900 text-lg leading-snug">{idea.title}</h4>
                     <p className="text-xs text-neutral-600 leading-relaxed bg-neutral-50 p-3 rounded-xl border border-neutral-100">
@@ -982,7 +910,6 @@ export const ReportResult: React.FC<ReportResultProps> = ({
                     </p>
                   </div>
 
-                  {/* Headline Copy */}
                   <div className="p-3.5 bg-amber-50/60 border border-amber-200/80 rounded-xl space-y-1">
                     <span className="text-[10px] font-bold text-amber-800 uppercase tracking-wide flex items-center gap-1">
                       <MousePointer2 className="w-3 h-3 text-amber-600" />
@@ -994,7 +921,6 @@ export const ReportResult: React.FC<ReportResultProps> = ({
                   </div>
                 </div>
 
-                {/* Sourcing Point */}
                 <div className="pt-3 border-t border-neutral-100 space-y-1">
                   <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider flex items-center gap-1">
                     <Layers className="w-3 h-3 text-neutral-500" />
@@ -1010,7 +936,7 @@ export const ReportResult: React.FC<ReportResultProps> = ({
         </div>
       </section>
 
-      {/* 7. Data Table (Market Signals) */}
+      {/* Data Table */}
       <section>
         <div className="flex items-center gap-3 mb-8 pb-4 border-b border-neutral-100">
           <div className="w-10 h-10 rounded-full bg-neutral-100 flex items-center justify-center">
@@ -1063,7 +989,7 @@ export const ReportResult: React.FC<ReportResultProps> = ({
         </div>
       </section>
 
-      {/* Original Markdown Report */}
+      {/* Markdown Report */}
       <section className="pt-10">
         <div className="flex items-center gap-3 mb-8 pb-4 border-b border-neutral-100">
           <div className="w-10 h-10 rounded-full bg-neutral-100 flex items-center justify-center">
@@ -1151,4 +1077,3 @@ export const ReportResult: React.FC<ReportResultProps> = ({
     </motion.div>
   );
 };
-
